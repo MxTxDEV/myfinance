@@ -11,6 +11,8 @@ import * as cards from "@/server/services/cards";
 import * as cat from "@/server/services/categories";
 import * as rec from "@/server/services/recurring";
 import { suggestions } from "@/server/services/ledger";
+import * as plan from "@/server/services/planning";
+import * as notif from "@/server/services/notifications";
 import { todayBR } from "@/domain/dates";
 
 export type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
@@ -49,3 +51,19 @@ export async function getSuggestions(type: "INCOME" | "EXPENSE") { return run(()
 export async function setHideValues(hide: boolean) { return run(async () => { const p = await assertOwner(); await prisma.profile.update({ where: { id: p.id }, data: { hideValues: hide } }); }); }
 export async function setTheme(theme: "system" | "light" | "dark") { return run(async () => { const p = await assertOwner(); await prisma.profile.update({ where: { id: p.id }, data: { theme } }); }); }
 export async function logout() { await endSession(); }
+
+export async function saveBudget(v: Parameters<typeof plan.upsertBudget>[0]) { return run(async () => { await plan.upsertBudget(v); }); }
+export async function removeBudget(id: string) { return run(async () => { await plan.deleteBudget(id); }); }
+export async function saveGoal(v: Parameters<typeof plan.createGoal>[0]) { return run(async () => { await plan.createGoal(v); }); }
+export async function saveGoalEntry(v: Parameters<typeof plan.addGoalEntry>[0]) { return run(async () => { await plan.addGoalEntry(v); }); }
+export async function removeGoal(id: string) { return run(async () => { await plan.archiveGoal(id); }); }
+export async function saveDebt(v: Parameters<typeof plan.createDebt>[0]) { return run(async () => { await plan.createDebt(v); }); }
+export async function saveDebtPayment(v: Parameters<typeof plan.payDebt>[0]) { return run(async () => { await plan.payDebt(v); }); }
+export async function saveAsset(v: Parameters<typeof plan.createAsset>[0]) { return run(async () => { await plan.createAsset(v); }); }
+export async function removeAsset(id: string) { return run(async () => { await plan.archiveAsset(id); }); }
+export async function changeAssetValue(id: string, value: number, on: string) { return run(async () => { await plan.updateAssetValue(id, value, on); }); }
+export async function pauseRecurring(id: string, active: boolean) { return run(async () => { await rec.setRecurringActive(id, active); }); }
+export async function readAllNotifications() { return run(async () => { await notif.markAllRead(); }); }
+export async function saveNotifyPrefs(disabled: string[], leadDays: number) {
+  return run(async () => { const p = await assertOwner(); await prisma.profile.update({ where: { id: p.id }, data: { notifyPrefs: { disabled, leadDays } } }); });
+}

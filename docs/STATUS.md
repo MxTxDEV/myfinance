@@ -1,0 +1,22 @@
+# Status por fase
+
+| Fase | Situação |
+|---|---|
+| 1 Fundação e design | ✅ Arquitetura, Figma (tokens + 4 telas), design system em código, Postgres + migrações, autenticação real |
+| 2 Núcleo financeiro | ✅ Dashboard, RECEBI/GASTEI, histórico (busca, filtros, ordenação, totais, paginação), categorias, contas, transferências, saldos |
+| 3 Compromissos | ✅ Cartões, faturas, parcelamento, pagamento total/parcial, recorrências idempotentes, contas a pagar/receber |
+| 4 Planejamento | ✅ Orçamentos, metas, dívidas (+simulação), patrimônio, relatórios, projeção, notificações, CSV/JSON, resumo imprimível |
+| 5 Qualidade | ✅ Testes, headers/CSP, a11y (axe), PWA, backup/restore testado · ⏳ ver pendências |
+
+## Testes
+- Unitários: dinheiro/arredondamento, datas, ciclo de cartão, recorrência, orçamento, metas, patrimônio, dívidas.
+- Integração (Postgres real): criação/edição/exclusão/duplicação, saldos, previstas, transferências, cartão (limite, faturas, parcelas, pagamento total/parcial), recorrências (incluindo chamadas concorrentes), orçamento, metas, dívidas, patrimônio, relatórios, notificações, desempenho com 10.000 registros.
+- E2E (navegador real): rotas e APIs protegidas, senha errada, fluxo conta→receita→gasto→saldo, persistência após recarregar, ocultar valores, sem rolagem horizontal, cartão parcelado/pagamento parcial, orçamento/meta, acessibilidade (axe WCAG A/AA) em 5 telas.
+
+## Pendências e limitações conhecidas
+- Edição de transferência e de dívida/meta/orçamento pela interface (a regra existe em serviço; na UI é possível excluir/recriar). Transferências são criadas em Perfil.
+- Anexos: o campo existe no modelo (`attachmentUrl`), mas não há upload na v1.
+- Edição de recorrência (hoje: pausar/retomar e recriar).
+- Limitador de login é em memória (instância única).
+- Saldos são calculados em memória a partir das movimentações efetivadas (rápido até dezenas de milhares; para volumes maiores, mover para agregação SQL).
+- Sem fila offline: sem internet o app mostra a página offline e não registra nada.

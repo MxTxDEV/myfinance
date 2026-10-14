@@ -5,8 +5,8 @@
   --bg: #f5f6f8; --surface: #ffffff; --surface-2: #eceef2; --border: #e2e5ea;
   --text: #0e1217; --text-muted: #5a6472;
   --accent: #4338ca; --on-accent: #ffffff;
-  --income: #0f8a47; --income-bg: #e3f6eb;
-  --expense: #d93a3f; --expense-bg: #fdecec;
+  --income: #0b7a3d; --income-bg: #e3f6eb;
+  --expense: #c42a30; --expense-bg: #fdecec;
   --warning: #b7791f;
   color-scheme: light;
 }

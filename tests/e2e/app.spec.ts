@@ -72,6 +72,9 @@ test("fluxo completo: conta, receita, gasto, persistência", async ({ page }) =>
   await page.reload();
   await expect(page.getByText("R$ ••••").first()).toBeVisible(); // preferência persistida
 
+  await page.getByRole("button", { name: "Mostrar valores" }).click();
+  await expect(page.getByText("R$ ••••")).toHaveCount(0);
+
   // sem rolagem horizontal no celular
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   expect(overflow).toBe(false);

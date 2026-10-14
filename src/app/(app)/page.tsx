@@ -3,6 +3,10 @@ import { requireOwner } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { dashboard } from "@/server/services/reports";
 import { generateRecurring } from "@/server/services/recurring";
+import { generateNotifications, unreadCount } from "@/server/services/notifications";
+import { Bell } from "lucide-react";
+import { goalsOverview } from "@/server/services/planning";
+import { Progress } from "@/components/ui";
 import { listTransactions } from "@/server/services/ledger";
 import { monthKey, monthRange, todayBR } from "@/domain/dates";
 import { Money, HideToggle } from "@/components/privacy";
@@ -19,10 +23,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
   const today = todayBR();
   const month = sp.m && /^\d{4}-(0[1-9]|1[0-2])$/.test(sp.m) ? sp.m : monthKey(today);
   await generateRecurring(today); // idempotente
-  const [d, recent, categories] = await Promise.all([
+  await generateNotifications(today); // idempotente (dedupeKey)
+  const unread = await unreadCount();
+  const [d, recent, categories, goals] = await Promise.all([
     dashboard(today, month),
     listTransactions({ sort: "date_desc" }),
     prisma.category.findMany({ where: { archivedAt: null } }),
+    goalsOverview(today),
   ]);
   const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: "America/Sao_Paulo" }).format(new Date())) % 24;
   const { end } = monthRange(month);
@@ -40,7 +47,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
           <h1 className="text-xl font-bold">{greeting(hour)}, {owner.name.split(" ")[0]}</h1>
           <MonthNav month={month} />
         </div>
-        <HideToggle />
+        <div className="flex items-center">
+          <Link href="/notificacoes" aria-label={unread ? `Notificações: ${unread} não lidas` : "Notificações"} className="relative grid size-11 place-items-center rounded-full text-muted hover:bg-surface-2">
+            <Bell className="size-5" />{unread > 0 && <span className="absolute right-2 top-2 size-2.5 rounded-full bg-expense" />}
+          </Link>
+          <HideToggle />
+        </div>
       </header>
 
       {noAccounts && (
@@ -87,6 +99,20 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
                   <p className={`text-xs ${u.overdue ? "font-semibold text-expense" : "text-muted"}`}>{u.overdue ? "Atrasado · " : ""}{u.date.split("-").reverse().join("/")}</p>
                 </div>
                 <Money cents={u.type === "INCOME" ? u.amount : -u.amount} sign className={`font-bold ${u.type === "INCOME" ? "text-income" : "text-expense"}`} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card title="Metas" action={<Link href="/planejamento?tab=metas" className="text-sm font-semibold text-accent">Ver metas</Link>}>
+        {goals.items.length === 0 ? <Empty title="Nenhuma meta ativa" hint="Crie uma meta em Planejamento para acompanhar o progresso." /> : (
+          <ul className="flex flex-col gap-3">
+            {goals.items.slice(0, 3).map((g) => (
+              <li key={g.id}>
+                <div className="mb-1 flex justify-between text-sm"><span className="font-medium">{g.name}</span><span className="font-semibold">{g.percent}%</span></div>
+                <Progress value={g.percent} label={`${g.name}: ${g.percent}%`} tone={g.percent >= 100 ? "income" : "accent"} />
+                <p className="mt-1 text-xs text-muted"><Money cents={g.saved} /> de <Money cents={g.target} /></p>
               </li>
             ))}
           </ul>

@@ -1,0 +1,161 @@
+"use client";
+import { useState } from "react";
+import { MoneyInput } from "@/components/money-input";
+import { Msg, Submit, field, useAction } from "@/components/form-kit";
+import * as A from "@/app/(app)/actions";
+
+type Opt = { id: string; name: string };
+
+export function BudgetForm({ categories }: { categories: Opt[] }) {
+  const { error, done, pending, run } = useAction();
+  const [cat, setCat] = useState(categories[0]?.id ?? ""); const [limit, setLimit] = useState(0); const [alerts, setAlerts] = useState("50,80,100");
+  return (
+    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault();
+      run(() => A.saveBudget({ categoryId: cat, limit, alertAt: alerts.split(",").map((x) => Number(x.trim())).filter((n) => n > 0) }), () => setLimit(0)); }}>
+      <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoria" className={field}>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      <MoneyInput cents={limit} onChange={setLimit} label="Limite mensal" className="!text-2xl" />
+      <label className="text-sm text-muted">Avisar ao atingir (%)<input value={alerts} onChange={(e) => setAlerts(e.target.value)} className={`${field} mt-1`} inputMode="numeric" /></label>
+      <Msg error={error} done={done} /><Submit pending={pending}>Salvar orçamento</Submit>
+    </form>
+  );
+}
+
+export function GoalForm({ accounts }: { accounts: Opt[] }) {
+  const { error, done, pending, run } = useAction();
+  const [name, setName] = useState(""); const [target, setTarget] = useState(0); const [date, setDate] = useState(""); const [prio, setPrio] = useState(2); const [acc, setAcc] = useState("");
+  return (
+    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault();
+      run(() => A.saveGoal({ name, targetAmount: target, targetDate: date || undefined, priority: prio, accountId: acc || undefined }), () => { setName(""); setTarget(0); }); }}>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da meta (ex.: Reserva de emergência)" aria-label="Nome da meta" required className={field} />
+      <MoneyInput cents={target} onChange={setTarget} label="Valor-alvo" className="!text-2xl" />
+      <div className="grid grid-cols-2 gap-3">
+        <label className="text-sm text-muted">Data desejada<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${field} mt-1`} /></label>
+        <label className="text-sm text-muted">Prioridade<select value={prio} onChange={(e) => setPrio(Number(e.target.value))} className={`${field} mt-1`}><option value={1}>Alta</option><option value={2}>Média</option><option value={3}>Baixa</option></select></label>
+      </div>
+      <select value={acc} onChange={(e) => setAcc(e.target.value)} aria-label="Conta associada" className={field}><option value="">Sem conta associada</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+      <Msg error={error} done={done} /><Submit pending={pending}>Criar meta</Submit>
+    </form>
+  );
+}
+
+export function GoalEntryForm({ goalId, today }: { goalId: string; today: string }) {
+  const { error, pending, run } = useAction();
+  const [amount, setAmount] = useState(0); const [withdraw, setWithdraw] = useState(false);
+  return (
+    <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); run(() => A.saveGoalEntry({ goalId, amount: withdraw ? -amount : amount, date: today }), () => setAmount(0)); }}>
+      <MoneyInput cents={amount} onChange={setAmount} label="Valor" className="!text-xl" />
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={withdraw} onChange={(e) => setWithdraw(e.target.checked)} className="size-5" />Retirada</label>
+      {error && <p role="alert" className="text-sm font-medium text-expense">{error}</p>}
+      <Submit pending={pending}>{withdraw ? "Registrar retirada" : "Registrar aporte"}</Submit>
+    </form>
+  );
+}
+
+export function DebtForm() {
+  const { error, done, pending, run } = useAction();
+  const [name, setName] = useState(""); const [creditor, setCreditor] = useState(""); const [orig, setOrig] = useState(0); const [bal, setBal] = useState(0);
+  const [rate, setRate] = useState(""); const [inst, setInst] = useState(0); const [n, setN] = useState(""); const [next, setNext] = useState("");
+  return (
+    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault();
+      run(() => A.saveDebt({ name, creditor: creditor || undefined, originalAmount: orig, balance: bal || orig, monthlyRate: rate ? Number(rate.replace(",", ".")) : undefined,
+        installmentAmount: inst || undefined, installmentsTotal: n ? Number(n) : undefined, nextDueDate: next || undefined }), () => { setName(""); setOrig(0); setBal(0); }); }}>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da dívida" aria-label="Nome da dívida" required className={field} />
+      <input value={creditor} onChange={(e) => setCreditor(e.target.value)} placeholder="Credor" aria-label="Credor" className={field} />
+      <p className="-mb-1 text-sm text-muted">Valor original</p><MoneyInput cents={orig} onChange={setOrig} label="Valor original" className="!text-xl" />
+      <p className="-mb-1 text-sm text-muted">Saldo devedor atual (vazio = valor original)</p><MoneyInput cents={bal} onChange={setBal} label="Saldo devedor" className="!text-xl" />
+      <div className="grid grid-cols-2 gap-3">
+        <input value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Juros % ao mês" aria-label="Juros ao mês" inputMode="decimal" className={field} />
+        <input value={n} onChange={(e) => setN(e.target.value)} placeholder="Nº de parcelas" aria-label="Número de parcelas" inputMode="numeric" className={field} />
+      </div>
+      <p className="-mb-1 text-sm text-muted">Valor da parcela</p><MoneyInput cents={inst} onChange={setInst} label="Valor da parcela" className="!text-xl" />
+      <label className="text-sm text-muted">Próximo vencimento<input type="date" value={next} onChange={(e) => setNext(e.target.value)} className={`${field} mt-1`} /></label>
+      <Msg error={error} done={done} /><Submit pending={pending}>Cadastrar dívida</Submit>
+    </form>
+  );
+}
+
+export function DebtPayForm({ debtId, balance, accounts, today }: { debtId: string; balance: number; accounts: Opt[]; today: string }) {
+  const { error, pending, run } = useAction();
+  const [amount, setAmount] = useState(0); const [acc, setAcc] = useState(accounts[0]?.id ?? "");
+  return (
+    <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); run(() => A.saveDebtPayment({ debtId, amount, date: today, accountId: acc })); }}>
+      <MoneyInput cents={amount} onChange={setAmount} label="Valor pago" className="!text-xl" />
+      <select value={acc} onChange={(e) => setAcc(e.target.value)} aria-label="Conta" className={field}>{accounts.map((a) => <option key={a.id} value={a.id}>Paga com: {a.name}</option>)}</select>
+      {amount > balance && <p className="text-sm text-expense">Maior que o saldo devedor.</p>}
+      {error && <p role="alert" className="text-sm font-medium text-expense">{error}</p>}
+      <Submit pending={pending}>Registrar pagamento</Submit>
+    </form>
+  );
+}
+
+export function AssetForm({ today }: { today: string }) {
+  const { error, done, pending, run } = useAction();
+  const [name, setName] = useState(""); const [type, setType] = useState("VEHICLE"); const [value, setValue] = useState(0);
+  return (
+    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); run(() => A.saveAsset({ name, type: type as "VEHICLE", value, valueUpdatedAt: today }), () => { setName(""); setValue(0); }); }}>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome (ex.: Carro, CDB)" aria-label="Nome do bem" required className={field} />
+      <select value={type} onChange={(e) => setType(e.target.value)} aria-label="Tipo" className={field}>
+        <option value="VEHICLE">Veículo</option><option value="PROPERTY">Imóvel</option><option value="EQUIPMENT">Equipamento</option><option value="INVESTMENT">Investimento</option><option value="OTHER">Outro</option>
+      </select>
+      <MoneyInput cents={value} onChange={setValue} label="Valor estimado" className="!text-xl" />
+      <Msg error={error} done={done} /><Submit pending={pending}>Cadastrar bem</Submit>
+    </form>
+  );
+}
+
+export function RecurringForm({ categories, accounts, cards, today }: { categories: (Opt & { type: string })[]; accounts: Opt[]; cards: Opt[]; today: string }) {
+  const { error, done, pending, run } = useAction();
+  const [type, setType] = useState<"INCOME" | "EXPENSE">("EXPENSE"); const [desc, setDesc] = useState(""); const [amount, setAmount] = useState(0);
+  const cats = categories.filter((c) => c.type === type); const [cat, setCat] = useState(""); const [target, setTarget] = useState(accounts[0] ? `acc:${accounts[0].id}` : "");
+  const [rec, setRec] = useState("MONTHLY"); const [interval, setInterval_] = useState("30"); const [start, setStart] = useState(today); const [end, setEnd] = useState("");
+  return (
+    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); const [k, id] = target.split(":");
+      run(() => A.saveRecurring({ description: desc, type, amount, categoryId: cat || cats[0]?.id, recurrence: rec as "MONTHLY", intervalDays: rec === "CUSTOM" ? Number(interval) : undefined,
+        startDate: start, endDate: end || undefined, ...(k === "card" ? { cardId: id } : { accountId: id }) }), () => { setDesc(""); setAmount(0); }); }}>
+      <div className="grid grid-cols-2 gap-3">
+        <select value={type} onChange={(e) => { setType(e.target.value as "INCOME" | "EXPENSE"); setCat(""); }} aria-label="Tipo" className={field}><option value="EXPENSE">Despesa</option><option value="INCOME">Receita</option></select>
+        <select value={rec} onChange={(e) => setRec(e.target.value)} aria-label="Recorrência" className={field}>
+          <option value="MONTHLY">Mensal</option><option value="WEEKLY">Semanal</option><option value="BIWEEKLY">Quinzenal</option><option value="YEARLY">Anual</option><option value="CUSTOM">Intervalo em dias</option>
+        </select>
+      </div>
+      {rec === "CUSTOM" && <input value={interval} onChange={(e) => setInterval_(e.target.value)} aria-label="Intervalo em dias" inputMode="numeric" className={field} />}
+      <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Descrição (ex.: Internet)" aria-label="Descrição" required className={field} />
+      <MoneyInput cents={amount} onChange={setAmount} label="Valor" className="!text-xl" />
+      <select value={cat || cats[0]?.id} onChange={(e) => setCat(e.target.value)} aria-label="Categoria" className={field}>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      <select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Conta ou cartão" className={field}>
+        <optgroup label="Contas">{accounts.map((a) => <option key={a.id} value={`acc:${a.id}`}>{a.name}</option>)}</optgroup>
+        {type === "EXPENSE" && cards.length > 0 && <optgroup label="Cartões">{cards.map((c) => <option key={c.id} value={`card:${c.id}`}>{c.name}</option>)}</optgroup>}
+      </select>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="text-sm text-muted">Primeira data<input type="date" value={start} onChange={(e) => setStart(e.target.value)} className={`${field} mt-1`} /></label>
+        <label className="text-sm text-muted">Até (opcional)<input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className={`${field} mt-1`} /></label>
+      </div>
+      <Msg error={error} done={done} /><Submit pending={pending}>Cadastrar compromisso</Submit>
+    </form>
+  );
+}
+
+export function RowBtn({ label, confirm, onRun, danger }: { label: string; confirm?: string; onRun: () => Promise<{ ok: boolean; error?: string }>; danger?: boolean }) {
+  const { error, pending, run } = useAction();
+  return (
+    <span className="inline-flex flex-col items-end">
+      <button disabled={pending} onClick={() => { if (confirm && !window.confirm(confirm)) return; run(onRun); }} className={`min-h-10 px-2 text-sm font-semibold ${danger ? "text-expense" : "text-accent"}`}>{label}</button>
+      {error && <span role="alert" className="max-w-48 text-right text-xs text-expense">{error}</span>}
+    </span>
+  );
+}
+
+const TYPES: [string, string][] = [["DUE_SOON", "Vencimentos próximos"], ["OVERDUE", "Contas atrasadas"], ["BUDGET", "Limites de orçamento"], ["GOAL_STALLED", "Metas sem progresso"], ["MONTHLY_SUMMARY", "Resumo mensal"], ["INVOICE_CLOSING", "Fechamento de fatura"], ["INVOICE_DUE", "Vencimento de fatura"]];
+export function NotifyPrefsForm({ disabled, leadDays }: { disabled: string[]; leadDays: number }) {
+  const { error, done, pending, run } = useAction();
+  const [off, setOff] = useState<string[]>(disabled); const [lead, setLead] = useState(leadDays);
+  return (
+    <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); run(() => A.saveNotifyPrefs(off, lead)); }}>
+      {TYPES.map(([k, l]) => (
+        <label key={k} className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-5" checked={!off.includes(k)} onChange={(e) => setOff(e.target.checked ? off.filter((x) => x !== k) : [...off, k])} />{l}</label>
+      ))}
+      <label className="mt-1 text-sm text-muted">Avisar com antecedência de (dias)<input type="number" min={1} max={14} value={lead} onChange={(e) => setLead(Number(e.target.value))} className={`${field} mt-1`} /></label>
+      <Msg error={error} done={done} /><Submit pending={pending}>Salvar preferências</Submit>
+    </form>
+  );
+}

@@ -55,3 +55,11 @@ export async function generateRecurring(today: DateOnly = todayBR(), horizonDays
   }
   return { created };
 }
+
+export async function listRecurring() {
+  const rows = await prisma.recurringCommitment.findMany({ include: { category: true }, orderBy: { createdAt: "asc" } });
+  return rows.map((r) => ({
+    id: r.id, description: r.description, type: r.type, amount: cents(r.amount), category: r.category.name, recurrence: r.recurrence,
+    intervalDays: r.intervalDays, startDate: r.startDate.toISOString().slice(0, 10), active: r.active,
+  }));
+}
