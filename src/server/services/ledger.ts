@@ -53,6 +53,7 @@ export async function listTransactions(f: LedgerFilters = {}) {
       categoryId: t.categoryId, categoryName: t.category?.name ?? null, categoryIcon: t.category?.icon ?? null,
       accountName: t.type === "TRANSFER_OUT" && t.transfer ? `${t.transfer.fromAccount.name} → ${t.transfer.toAccount.name}` : t.card?.name ?? t.account?.name ?? null,
       cardId: t.cardId, accountId: t.accountId, installment: t.planId ? `${t.installmentNumber}` : null,
+      transfer: t.transfer ? { fromAccountId: t.transfer.fromAccountId, toAccountId: t.transfer.toAccountId } : null,
       notes: t.notes, payerSource: t.payerSource, dueDate: t.dueDate ? dateOut(t.dueDate) : null, transferId: t.transferId,
     })),
   };

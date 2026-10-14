@@ -127,7 +127,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
         {recent.items.length === 0 ? (
           <Card><Empty title="Nenhuma movimentação ainda" hint="Toque em RECEBI ou GASTEI para registrar a primeira." /></Card>
         ) : (
-          <TxList items={recent.items.slice(0, 6)} categories={categories} grouped={false} />
+          <TxList items={recent.items.slice(0, 6)} categories={categories} accounts={d.accounts.map((a) => ({ id: a.id, name: a.name }))} grouped={false} />
         )}
       </section>
     </div>

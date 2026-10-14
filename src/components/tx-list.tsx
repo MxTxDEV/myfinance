@@ -5,7 +5,7 @@ import { ArrowLeftRight, CreditCard, X } from "lucide-react";
 import { Money } from "./privacy";
 import { CategoryIcon } from "./icons";
 import { MoneyInput } from "./money-input";
-import { copyTransaction, editTransaction, removeTransaction, settle } from "@/app/(app)/actions";
+import { copyTransaction, editTransaction, editTransfer, removeTransaction, settle } from "@/app/(app)/actions";
 import type { LedgerItem } from "@/server/services/ledger";
 
 export interface CatOpt { id: string; name: string; type: "INCOME" | "EXPENSE" }
@@ -17,7 +17,7 @@ function fmtDay(iso: string) {
   return new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(dt).toUpperCase();
 }
 
-export function TxList({ items, categories, grouped = true }: { items: LedgerItem[]; categories: CatOpt[]; grouped?: boolean }) {
+export function TxList({ items, categories, accounts = [], grouped = true }: { items: LedgerItem[]; categories: CatOpt[]; accounts?: { id: string; name: string }[]; grouped?: boolean }) {
   const [sel, setSel] = useState<LedgerItem | null>(null);
   const groups = grouped ? [...Map.groupBy(items, (i) => i.date)] : [["", items] as const];
   return (
@@ -30,7 +30,7 @@ export function TxList({ items, categories, grouped = true }: { items: LedgerIte
           </ul>
         </section>
       ))}
-      {sel && <Detail t={sel} categories={categories} onClose={() => setSel(null)} />}
+      {sel && <Detail t={sel} categories={categories} accounts={accounts} onClose={() => setSel(null)} />}
     </>
   );
 }
@@ -58,7 +58,7 @@ function Row({ t, onOpen }: { t: LedgerItem; onOpen: () => void }) {
   );
 }
 
-function Detail({ t, categories, onClose }: { t: LedgerItem; categories: CatOpt[]; onClose: () => void }) {
+function Detail({ t, categories, accounts, onClose }: { t: LedgerItem; categories: CatOpt[]; accounts: { id: string; name: string }[]; onClose: () => void }) {
   const router = useRouter();
   const [edit, setEdit] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -69,6 +69,9 @@ function Detail({ t, categories, onClose }: { t: LedgerItem; categories: CatOpt[
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const locked = t.type !== "INCOME" && t.type !== "EXPENSE";
+  const isTransfer = t.type === "TRANSFER_OUT" && !!t.transfer;
+  const [from, setFrom] = useState(t.transfer?.fromAccountId ?? "");
+  const [to, setTo] = useState(t.transfer?.toAccountId ?? "");
   const isPlan = !!t.installment;
 
   const act = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
@@ -110,7 +113,7 @@ function Detail({ t, categories, onClose }: { t: LedgerItem; categories: CatOpt[
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 {t.status === "PLANNED" && <button disabled={pending} onClick={() => act(() => settle(t.id))} className="col-span-2 rounded-md bg-accent py-3.5 font-bold text-on-accent">{incomeLike(t.type) ? "Marcar como recebido" : "Marcar como pago"}</button>}
-                {!locked && <button onClick={() => setEdit(true)} className="rounded-md bg-surface-2 py-3.5 font-semibold">Editar</button>}
+                {(!locked || isTransfer) && <button onClick={() => setEdit(true)} className="rounded-md bg-surface-2 py-3.5 font-semibold">Editar</button>}
                 {!locked && <button disabled={pending} onClick={() => act(() => copyTransaction(t.id))} className="rounded-md bg-surface-2 py-3.5 font-semibold">Duplicar</button>}
                 <button onClick={() => setConfirmDel(true)} className={`rounded-md bg-expense-bg py-3.5 font-semibold text-expense ${locked ? "col-span-2" : "col-span-2"}`}>Excluir</button>
               </div>
@@ -118,12 +121,18 @@ function Detail({ t, categories, onClose }: { t: LedgerItem; categories: CatOpt[
           </>
         ) : (
           <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); setError(null);
+            if (isTransfer) return act(() => editTransfer(t.transferId!, { fromAccountId: from, toAccountId: to, amount, date, description: desc }));
             act(() => editTransaction(t.id, { description: desc, categoryId: cat || undefined, ...(isPlan ? {} : { amount, date }) })); }}>
             {!isPlan && <MoneyInput cents={amount} onChange={setAmount} className={incomeLike(t.type) ? "text-income" : "text-expense"} />}
             <input value={desc} onChange={(e) => setDesc(e.target.value)} aria-label="Descrição" className={field} maxLength={120} />
-            <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoria" className={field}>
+            {isTransfer ? (
+              <div className="grid grid-cols-2 gap-3">
+                <select value={from} onChange={(e) => setFrom(e.target.value)} aria-label="Conta de origem" className={field}>{accounts.map((a) => <option key={a.id} value={a.id}>De: {a.name}</option>)}</select>
+                <select value={to} onChange={(e) => setTo(e.target.value)} aria-label="Conta de destino" className={field}>{accounts.map((a) => <option key={a.id} value={a.id}>Para: {a.name}</option>)}</select>
+              </div>
+            ) : <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoria" className={field}>
               {categories.filter((c) => c.type === t.type).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </select>}
             {!isPlan && <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Data" className={field} />}
             {isPlan && <p className="text-xs text-muted">Valor e data de compras parceladas não podem ser editados; exclua e recadastre.</p>}
             {error && <p role="alert" className="text-sm font-medium text-expense">{error}</p>}

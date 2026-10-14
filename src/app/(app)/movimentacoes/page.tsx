@@ -40,7 +40,7 @@ export default async function Movimentacoes({ searchParams }: { searchParams: Pr
       {res.items.length === 0 ? (
         <Card><Empty title="Nada encontrado" hint="Ajuste os filtros ou registre uma nova movimentação." /></Card>
       ) : (
-        <TxList items={res.items} categories={categories} grouped={!byAmount} />
+        <TxList items={res.items} categories={categories} accounts={accounts} grouped={!byAmount} />
       )}
       <div className="flex justify-between">
         {res.page > 0 ? <Link href={qs(res.page - 1)} className="rounded-md bg-surface-2 px-4 py-3 font-semibold">← Anteriores</Link> : <span />}

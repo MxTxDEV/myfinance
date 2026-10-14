@@ -67,3 +67,4 @@ export async function readAllNotifications() { return run(async () => { await no
 export async function saveNotifyPrefs(disabled: string[], leadDays: number) {
   return run(async () => { const p = await assertOwner(); await prisma.profile.update({ where: { id: p.id }, data: { notifyPrefs: { disabled, leadDays } } }); });
 }
+export async function editTransfer(id: string, v: Parameters<typeof tr.updateTransfer>[1]) { return run(async () => { await tr.updateTransfer(id, v); }); }

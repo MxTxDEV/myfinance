@@ -77,6 +77,41 @@ test("planejamento: orçamento, meta e dívida", async ({ page }) => {
   await expect(page.getByText("Taxa de poupança").first()).toBeVisible();
 });
 
+test("transferência e edição/duplicação/exclusão pela interface", async ({ page }) => {
+  await login(page);
+  await page.goto("/perfil");
+  await page.getByText("Transferir entre contas").click();
+  await page.getByLabel("Valor da transferência").fill("10000");
+  await page.getByLabel("Conta de origem").selectOption({ label: "De: Conta Principal" });
+  await page.getByLabel("Conta de destino").selectOption({ label: "Para: Banco" });
+  await page.getByRole("button", { name: "Transferir" }).click();
+  await saved(page);
+
+  await page.goto("/movimentacoes?type=TRANSFER");
+  await page.getByRole("button", { name: /^Transferência/ }).click();
+  await page.getByRole("button", { name: "Editar" }).click();
+  await page.getByLabel("Valor", { exact: true }).fill("25000");
+  await page.getByRole("button", { name: "Salvar", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText("R$ 250,00").first()).toBeVisible();
+
+  // duplicar e excluir uma despesa comum
+  await page.goto("/movimentacoes?q=Mercado");
+  await page.getByRole("button", { name: /^Mercado/ }).first().click();
+  await page.getByRole("button", { name: "Duplicar" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("button", { name: /^Mercado/ })).toHaveCount(2);
+  await page.getByRole("button", { name: /^Mercado/ }).first().click();
+  await page.getByRole("button", { name: "Excluir" }).click();
+  await expect(page.getByRole("alertdialog")).toContainText("saldo será recalculado");
+  await page.getByRole("alertdialog").getByRole("button", { name: "Excluir" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("button", { name: /^Mercado/ })).toHaveCount(1);
+});
+
 test("acessibilidade: sem violações sérias nas telas principais", async ({ page }) => {
   await login(page);
   for (const url of ["/", "/movimentacoes", "/perfil", "/planejamento?tab=metas", "/notificacoes"]) {

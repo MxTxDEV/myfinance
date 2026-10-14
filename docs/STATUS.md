@@ -14,7 +14,7 @@
 - E2E (navegador real): rotas e APIs protegidas, senha errada, fluxo conta→receita→gasto→saldo, persistência após recarregar, ocultar valores, sem rolagem horizontal, cartão parcelado/pagamento parcial, orçamento/meta, acessibilidade (axe WCAG A/AA) em 5 telas.
 
 ## Pendências e limitações conhecidas
-- Edição de transferência e de dívida/meta/orçamento pela interface (a regra existe em serviço; na UI é possível excluir/recriar). Transferências são criadas em Perfil.
+- Edição de dívida, meta e orçamento pela interface (a regra de orçamento é "upsert": redefinir o limite edita). Transferências podem ser editadas na lista e são criadas em Perfil.
 - Anexos: o campo existe no modelo (`attachmentUrl`), mas não há upload na v1.
 - Edição de recorrência (hoje: pausar/retomar e recriar).
 - Limitador de login é em memória (instância única).
