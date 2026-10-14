@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import { prisma } from "./db";
+import { ensureDefaultCategories } from "./services/categories";
 
 const scrypt = promisify(scryptCb) as (pw: string, salt: Buffer, len: number, opts: object) => Promise<Buffer>;
 const SCRYPT = { N: 1 << 15, r: 8, p: 1, maxmem: 128 * 1024 * 1024 };
@@ -72,7 +73,18 @@ export async function endSession() {
 }
 
 /** Valida sessão no servidor (assinatura + versão no banco). Use em páginas e ações. */
+/** Modo aberto temporário (AUTH_DISABLED=true): sem login. Qualquer pessoa com a URL acessa os dados. */
+export const authDisabled = () => process.env.AUTH_DISABLED === "true";
+
+async function openModeOwner() {
+  const existing = await prisma.profile.findFirst();
+  if (existing) return existing;
+  await ensureDefaultCategories();
+  return prisma.profile.create({ data: { email: "aberto@local", name: "Você", passwordHash: "disabled" } }); // hash inválido: login por senha impossível
+}
+
 export async function getOwner() {
+  if (authDisabled()) return openModeOwner();
   const s = await readSession((await cookies()).get(SESSION_COOKIE)?.value);
   if (!s) return null;
   const p = await prisma.profile.findUnique({ where: { id: s.sub } });
