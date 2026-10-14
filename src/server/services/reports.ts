@@ -42,8 +42,8 @@ export async function monthSummary(key: string = monthKey(todayBR())) {
 }
 
 /** Visão da tela inicial: saldo real, reservado, faturas, saldo projetado e próximos compromissos. */
-export async function dashboard(today: DateOnly = todayBR()) {
-  const [accounts, cards, summary] = await Promise.all([accountBalances(), cardOverview(today), monthSummary(monthKey(today))]);
+export async function dashboard(today: DateOnly = todayBR(), month: string = monthKey(today)) {
+  const [accounts, cards, summary] = await Promise.all([accountBalances(), cardOverview(today), monthSummary(month)]);
   const available = accounts.filter((a) => a.type !== "INVESTMENT").reduce((s, a) => s + a.balance, 0);
   const invested = accounts.filter((a) => a.type === "INVESTMENT").reduce((s, a) => s + a.balance, 0);
   const goalAgg = await prisma.goalEntry.aggregate({ _sum: { amount: true }, where: { goal: { archivedAt: null } } });
