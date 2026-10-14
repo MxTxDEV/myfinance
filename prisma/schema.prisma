@@ -1,0 +1,338 @@
+// Finance OS — modelo relacional (uso pessoal, um único proprietário).
+// Dinheiro: sempre Decimal(14,2) em BRL. Nunca Float.
+// Regras de negócio: ver docs/DECISIONS.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountType {
+  CHECKING
+  DIGITAL
+  CASH
+  SAVINGS
+  INVESTMENT
+  OTHER
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+// INVOICE_PAYMENT e DEBT_PAYMENT são saídas de caixa que liquidam obrigações já
+// reconhecidas; NÃO entram em "despesas" nos relatórios (evita contar duas vezes).
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER_IN
+  TRANSFER_OUT
+  INVOICE_PAYMENT
+  DEBT_PAYMENT
+}
+
+// PLANNED = previsto (não afeta saldo real). SETTLED = recebido/pago (afeta saldo).
+enum TransactionStatus {
+  PLANNED
+  SETTLED
+}
+
+enum Recurrence {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+enum AssetType {
+  INVESTMENT
+  PROPERTY
+  VEHICLE
+  EQUIPMENT
+  OTHER
+}
+
+enum NotificationType {
+  DUE_SOON
+  OVERDUE
+  BUDGET
+  GOAL_STALLED
+  MONTHLY_SUMMARY
+  INVOICE_CLOSING
+  INVOICE_DUE
+}
+
+model Profile {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String
+  passwordHash    String
+  // incrementa ao trocar a senha: invalida sessões antigas
+  sessionVersion  Int      @default(0)
+  theme           String   @default("system")
+  hideValues      Boolean  @default(false)
+  notifyPrefs     Json     @default("{}")
+  currency        String   @default("BRL")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Account {
+  id                 String      @id @default(cuid())
+  name               String
+  institution        String?
+  type               AccountType
+  initialBalance     Decimal     @default(0) @db.Decimal(14, 2)
+  initialBalanceDate DateTime    @db.Date
+  color              String      @default("#4338CA")
+  icon               String      @default("wallet")
+  archivedAt         DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  transactions Transaction[]
+  cardsPaying  CreditCard[]
+  goals        Goal[]
+  transfersOut Transfer[]    @relation("TransferFrom")
+  transfersIn  Transfer[]    @relation("TransferTo")
+}
+
+model Category {
+  id         String       @id @default(cuid())
+  name       String
+  type       CategoryType
+  icon       String       @default("tag")
+  color      String       @default("#64748B")
+  favorite   Boolean      @default(false)
+  archivedAt DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  transactions Transaction[]
+  budgets      Budget[]
+  recurrings   RecurringCommitment[]
+
+  @@unique([type, name])
+}
+
+model Transfer {
+  id            String    @id @default(cuid())
+  fromAccountId String
+  toAccountId   String
+  amount        Decimal   @db.Decimal(14, 2)
+  date          DateTime  @db.Date
+  description   String?
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  fromAccount  Account       @relation("TransferFrom", fields: [fromAccountId], references: [id])
+  toAccount    Account       @relation("TransferTo", fields: [toAccountId], references: [id])
+  transactions Transaction[]
+
+  @@index([date])
+}
+
+model CreditCard {
+  id           String    @id @default(cuid())
+  name         String
+  issuer       String?
+  limit        Decimal   @db.Decimal(14, 2)
+  closingDay   Int
+  dueDay       Int
+  payAccountId String
+  color        String    @default("#7C3AED")
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  payAccount   Account            @relation(fields: [payAccountId], references: [id])
+  invoices     Invoice[]
+  transactions Transaction[]
+  plans        InstallmentPlan[]
+}
+
+// Uma fatura por cartão e mês de referência (mês em que a fatura FECHA). Ex.: "2026-10".
+model Invoice {
+  id             String   @id @default(cuid())
+  cardId         String
+  referenceMonth String
+  closingDate    DateTime @db.Date
+  dueDate        DateTime @db.Date
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  card         CreditCard    @relation(fields: [cardId], references: [id])
+  transactions Transaction[]
+
+  @@unique([cardId, referenceMonth])
+  @@index([dueDate])
+}
+
+model InstallmentPlan {
+  id          String   @id @default(cuid())
+  cardId      String
+  description String
+  totalAmount Decimal  @db.Decimal(14, 2)
+  count       Int
+  purchaseDate DateTime @db.Date
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  card         CreditCard    @relation(fields: [cardId], references: [id])
+  transactions Transaction[]
+}
+
+model RecurringCommitment {
+  id             String       @id @default(cuid())
+  description    String
+  type           CategoryType
+  amount         Decimal      @db.Decimal(14, 2)
+  categoryId     String
+  accountId      String?
+  cardId         String?
+  recurrence     Recurrence
+  intervalDays   Int?
+  startDate      DateTime     @db.Date
+  endDate        DateTime?    @db.Date
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  category     Category      @relation(fields: [categoryId], references: [id])
+  transactions Transaction[]
+}
+
+model Transaction {
+  id            String            @id @default(cuid())
+  type          TransactionType
+  status        TransactionStatus @default(SETTLED)
+  amount        Decimal           @db.Decimal(14, 2) // sempre positivo; o sinal vem do tipo
+  description   String
+  date          DateTime          @db.Date // data da competência / do pagamento
+  dueDate       DateTime?         @db.Date
+  settledAt     DateTime?
+  categoryId    String?
+  accountId     String? // nulo em compras no cartão (não mexe no saldo bancário)
+  cardId        String?
+  invoiceId     String?
+  payerSource   String?
+  notes         String?
+  attachmentUrl String?
+  transferId    String?
+  planId        String?
+  installmentNumber Int?
+  recurringId   String?
+  occurrenceDate DateTime?        @db.Date
+  debtId        String?
+  deletedAt     DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  category  Category?        @relation(fields: [categoryId], references: [id])
+  account   Account?         @relation(fields: [accountId], references: [id])
+  card      CreditCard?      @relation(fields: [cardId], references: [id])
+  invoice   Invoice?         @relation(fields: [invoiceId], references: [id])
+  transfer  Transfer?        @relation(fields: [transferId], references: [id])
+  plan      InstallmentPlan? @relation(fields: [planId], references: [id])
+  recurring RecurringCommitment? @relation(fields: [recurringId], references: [id])
+  debt      Debt?            @relation(fields: [debtId], references: [id])
+
+  // Idempotência de recorrências: uma ocorrência por (compromisso, data).
+  @@unique([recurringId, occurrenceDate])
+  @@index([date])
+  @@index([accountId, date])
+  @@index([cardId, invoiceId])
+  @@index([categoryId, date])
+  @@index([status, date])
+  @@index([description])
+}
+
+model Budget {
+  id         String   @id @default(cuid())
+  categoryId String   @unique
+  limit      Decimal  @db.Decimal(14, 2)
+  alertAt    Int[]    @default([50, 80, 100])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category Category @relation(fields: [categoryId], references: [id])
+}
+
+model Goal {
+  id            String    @id @default(cuid())
+  name          String
+  targetAmount  Decimal   @db.Decimal(14, 2)
+  targetDate    DateTime? @db.Date
+  priority      Int       @default(2)
+  description   String?
+  accountId     String?
+  archivedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  account Account?     @relation(fields: [accountId], references: [id])
+  entries GoalEntry[]
+}
+
+// Aporte (+) ou retirada (−). Não é receita nem despesa: é reserva dentro do patrimônio.
+model GoalEntry {
+  id        String   @id @default(cuid())
+  goalId    String
+  amount    Decimal  @db.Decimal(14, 2) // positivo = aporte, negativo = retirada
+  date      DateTime @db.Date
+  note      String?
+  createdAt DateTime @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id])
+
+  @@index([goalId, date])
+}
+
+model Debt {
+  id              String    @id @default(cuid())
+  name            String
+  creditor        String?
+  originalAmount  Decimal   @db.Decimal(14, 2)
+  balance         Decimal   @db.Decimal(14, 2)
+  monthlyRate     Decimal?  @db.Decimal(8, 4) // % ao mês, quando conhecida
+  installmentAmount Decimal? @db.Decimal(14, 2)
+  installmentsTotal Int?
+  nextDueDate     DateTime? @db.Date
+  archivedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  payments Transaction[]
+}
+
+model Asset {
+  id             String    @id @default(cuid())
+  name           String
+  type           AssetType
+  value          Decimal   @db.Decimal(14, 2)
+  valueUpdatedAt DateTime  @db.Date
+  notes          String?
+  archivedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  body      String
+  // Evita repetição: uma notificação por chave (ex.: "budget:cat:2026-10:80").
+  dedupeKey String           @unique
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([readAt, createdAt])
+}
