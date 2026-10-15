@@ -67,6 +67,29 @@ describe("importar extrato da conta", () => {
   });
 });
 
+describe("importar PDF", () => {
+  const PDF = `%%PDFTEXT%%\nSALDO ANTERIOR 1.000,00\n05/10/2026 SALARIO EMPRESA 4.600,00 5.600,00\n13/10/2026 MERCADO SAO JOAO 86,50 5.513,50\n14/10/2026 DEPOSITO RECEBIDO 300,00\n15/10/2026 XYZ COMERCIO 20,00`;
+  it("conta: o saldo confirma entrada/saída; o que ficou sem sinal é sugerido pelas palavras e marcado para conferência", async () => {
+    const p = await previewStatement({ text: PDF, kind: "account", targetId: s.bank.id });
+    expect(p.format).toBe("pdf");
+    expect(p.rows.map((r) => [r.description, r.type, r.amount, r.uncertain])).toEqual([
+      ["SALARIO EMPRESA", "INCOME", 460000, false], ["MERCADO SAO JOAO", "EXPENSE", 8650, false],
+      ["DEPOSITO RECEBIDO", "INCOME", 30000, true], ["XYZ COMERCIO", "EXPENSE", 2000, true],
+    ]);
+    expect(p.rows[2].note).toMatch(/confira/i);
+  });
+  it("fatura em PDF: valores sem sinal são compras; crédito/pagamento fica de fora; reimportar não duplica", async () => {
+    const fatura = `%%PDFTEXT%%\n05 OUT NETFLIX 55,90\n11 OUT PADARIA 35,90\n14 OUT PAGAMENTO RECEBIDO -91,80\nEmitido em 20/10/2026`;
+    const p = await previewStatement({ text: fatura, kind: "card", targetId: s.card.id });
+    expect(p.rows.filter((r) => !r.skip).map((r) => r.description)).toEqual(["NETFLIX", "PADARIA"]);
+    expect(p.rows.every((r) => r.type === "EXPENSE")).toBe(true);
+    const rows = p.rows.filter((r) => !r.skip).map((r) => ({ ...r, categoryId: s.food.id }));
+    expect((await commitStatement({ kind: "card", targetId: s.card.id, rows })).created).toBe(2);
+    const again = await previewStatement({ text: fatura, kind: "card", targetId: s.card.id });
+    expect(again.rows.filter((r) => r.duplicate === "exact")).toHaveLength(2);
+  });
+});
+
 describe("importar fatura do cartão", () => {
   const CSV = `Data,Valor,Identificador,Descrição\n05/10/2026,120.00,c1,Netflix\n11/10/2026,35.90,c2,Padaria\n12/10/2026,-155.90,c3,Pagamento recebido`;
   it("compras viram despesas no cartão (consomem limite, não mexem no saldo) e pagamento/estorno fica de fora", async () => {

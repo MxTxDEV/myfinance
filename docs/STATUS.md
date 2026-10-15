@@ -10,7 +10,8 @@
 
 ## Atualização — offline, investimentos, contas fixas e mensagens
 ✅ App offline com fila e sincronização idempotente · ✅ Investimentos (aporte/resgate/valor/rentabilidade/distribuição) · ✅ Contas fixas (painel do mês, editar, encerrar, repetir) · ✅ 170 mensagens (gastar + investir, com emojis) em horários aleatórios 06:00–22:00 com menu de configuração · ✅ avisos push de vencimento de contas, faturas e dívidas (estágios 3/1/0 dias, agrupados) · ✅ parabéns por conquistas (meta, dívida, mês no azul, orçamento) · ✅ incentivo agressivo "não desista" · ✅ som de caixa registradora.
-✅ Importação de extrato/fatura (OFX/CSV) com categoria aprendida e anti-duplicidade · ✅ lançamento vinculado a dívida/investimento/meta · ✅ teste de conservação do patrimônio entre todos os módulos · ⏳ ligação automática com o banco (Open Finance): plano em `docs/OPEN_FINANCE.md`, depende de provedor e credenciais.
+✅ Importação de extrato/fatura (PDF, OFX, CSV) com categoria aprendida e anti-duplicidade · ✅ lançamento vinculado a dívida/investimento/meta · ✅ teste de conservação do patrimônio entre todos os módulos · ⏳ ligação automática com o banco (Open Finance): plano em `docs/OPEN_FINANCE.md`, depende de provedor e credenciais.
+Limitações do PDF: só PDFs com texto (não digitalizados) e layouts que sigam "data + descrição + valor"; layouts muito diferentes podem exigir ajuste do interpretador (envie um exemplo sem dados sensíveis).
 Limitações: os horários aleatórios exigem um agendador externo chamando `/api/cron/tick` a cada 5 min (cron-job.org); som personalizado só dentro do app; push no iPhone exige app instalado; offline não permite editar/excluir.
 
 ## Testes

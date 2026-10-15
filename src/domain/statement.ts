@@ -5,7 +5,7 @@ export interface StatementRow {
   amount: number; // centavos; negativo = saída, positivo = entrada (como vem no extrato)
   externalId?: string; // FITID do OFX / identificador do banco
 }
-export interface ParsedStatement { rows: StatementRow[]; warnings: string[]; format: "ofx" | "csv" }
+export interface ParsedStatement { rows: StatementRow[]; warnings: string[]; format: "ofx" | "csv" | "pdf" }
 
 /** "1.234,56", "-1234.56", "R$ 12,5", "(45,90)" → centavos. null se não for número. */
 export function parseAmount(raw: string): number | null {

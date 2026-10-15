@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const PUBLIC = ["/login", "/manifest.webmanifest", "/icon.svg", "/sw.js", "/offline"];
+const PUBLIC = ["/login", "/manifest.webmanifest", "/icon.svg", "/sw.js", "/offline", "/pdf.worker.min.mjs"];
 // /api/cron/* se protege sozinha com CRON_SECRET (o agendador não tem cookie de sessão).
 const PUBLIC_PREFIX = ["/sounds/", "/api/cron/"];
 

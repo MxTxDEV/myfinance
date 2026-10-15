@@ -36,7 +36,8 @@ Os testes de integração/E2E usam o banco `finance_os_test` (crie com `createdb
 
 ## Importar extrato do banco e fatura do cartão
 
-Em **Perfil → Importar extrato do banco ou fatura**: escolha a conta (extrato) ou o cartão (fatura), envie o arquivo **OFX ou CSV** baixado no app do banco, revise e confirme.
+Em **Perfil → Importar extrato do banco ou fatura**: escolha a conta (extrato) ou o cartão (fatura), envie o arquivo **PDF, OFX ou CSV** baixado no app do banco, revise e confirme.
+- **PDF:** é lido **no seu aparelho** (o arquivo não é enviado ao servidor, só o texto extraído). Funciona com PDFs de texto (a maioria dos extratos e faturas) e pede a senha se o PDF for protegido. O entendimento é por regras (datas, valores, coluna de saldo, marcadores D/C), não por IA: cada linha vem com botão para trocar entrada/saída e as duvidosas aparecem com “⚠ confira”. PDF digitalizado (imagem) não tem texto e não é lido — nesse caso use OFX/CSV. Sempre que o banco oferecer OFX, ele é o formato mais confiável.
 - Reconhece formatos brasileiros (data dd/mm/aaaa, `1.234,56`, `;` ou `,`, colunas Débito/Crédito).
 - **Categoria sugerida** pelo que você já lançou com a mesma descrição; você ajusta antes de gravar.
 - **Não duplica:** reimportar o mesmo arquivo não cria nada de novo; lançamentos que você já digitou à mão (mesmo valor, ±1 dia) vêm desmarcados.

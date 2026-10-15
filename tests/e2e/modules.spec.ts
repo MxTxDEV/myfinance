@@ -299,6 +299,42 @@ test("importar extrato OFX: revisar, gravar e reimportar sem duplicar", async ({
   await expect(page.getByRole("button", { name: /^MERCADO TESTE IMPORT/ })).toHaveCount(1);
 });
 
+test("importar PDF de extrato: lê no aparelho, pede senha quando protegido e não duplica", async ({ page }) => {
+  await login(page);
+  await page.goto("/perfil");
+  await page.getByText("Importar extrato do banco ou fatura").click();
+  const panel = page.locator("details[open]");
+  await panel.getByLabel("Importar para").selectOption({ label: "Banco" });
+  await page.getByLabel("Arquivo do extrato").setInputFiles("tests/fixtures/extrato.pdf");
+  await expect(page.getByText("3 de 4 selecionados")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/Pagamento de fatura: registre em Perfil/)).toBeVisible();
+  // o saldo do extrato confirmou entradas e saídas
+  await expect(page.getByLabel("Importar SALARIO EMPRESA PDF")).toBeChecked();
+  await expect(page.getByRole("button", { name: /Trocar SALARIO EMPRESA PDF para saída/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Trocar MERCADO PDF TESTE para entrada/ })).toBeVisible();
+  await page.getByLabel("Categoria de SALARIO EMPRESA PDF").selectOption({ label: "Salário" });
+  await page.getByLabel("Categoria de MERCADO PDF TESTE").selectOption({ label: "Mercado" });
+  await page.getByLabel("Categoria de ACADEMIA PDF TESTE").selectOption({ label: "Academia" });
+  await page.getByRole("button", { name: /^Importar 3 lançamento/ }).click();
+  await expect(page.getByText("3 importado(s)")).toBeVisible();
+  await page.goto("/movimentacoes?q=PDF TESTE");
+  await expect(page.getByRole("button", { name: /^MERCADO PDF TESTE/ })).toHaveCount(1);
+
+  // mesmo conteúdo em PDF protegido por senha
+  await page.goto("/perfil");
+  await page.getByText("Importar extrato do banco ou fatura").click();
+  await page.locator("details[open]").getByLabel("Importar para").selectOption({ label: "Banco" });
+  await page.getByLabel("Arquivo do extrato").setInputFiles("tests/fixtures/extrato-senha.pdf");
+  await expect(page.getByText(/Este PDF tem senha/)).toBeVisible({ timeout: 20_000 });
+  await page.getByLabel("Senha do PDF").fill("errada");
+  await page.getByRole("button", { name: "Abrir PDF" }).click();
+  await expect(page.getByText("Senha incorreta. Tente de novo:")).toBeVisible();
+  await page.getByLabel("Senha do PDF").fill("12345");
+  await page.getByRole("button", { name: "Abrir PDF" }).click();
+  await expect(page.getByText("0 de 4 selecionados")).toBeVisible({ timeout: 20_000 }); // já importados antes
+  await expect(page.getByText("Já importado antes.").first()).toBeVisible();
+});
+
 test("vincular o lançamento a uma dívida atualiza conta e saldo devedor juntos", async ({ page }) => {
   await login(page);
   await page.goto("/planejamento?tab=dividas");

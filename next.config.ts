@@ -9,6 +9,7 @@ const csp = [
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   "connect-src 'self'",
+  "worker-src 'self' blob:", // leitura de PDF (pdf.js) roda em um worker do próprio site
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

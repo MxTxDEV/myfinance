@@ -70,6 +70,11 @@
 - Cartão: o sinal predominante do arquivo define o que é compra; o restante (pagamento/estorno) vem desmarcado.
 - Lançamento **vinculado** reutiliza os serviços existentes (dívida: `DEBT_PAYMENT`; investimento: `INVESTMENT_OUT/IN`; meta: reserva interna sem mexer no saldo da conta), por isso herda todas as validações. **Conservação do patrimônio** (teste de integração): Δ patrimônio = receitas − despesas + valorização.
 
+## Leitura de PDF
+- Extração do texto com pdf.js **no navegador** (worker em `/pdf.worker.min.mjs`, copiado por `scripts/copy-pdf-worker.mjs`; CSP `worker-src 'self' blob:`): o PDF não sai do aparelho e não depende de limites de servidor. O servidor recebe só o texto (marcador `%%PDFTEXT%%`) e o interpreta com `parsePDFText` (puro e testado).
+- Sinal da transação, em ordem de confiança: (1) variação do saldo da coluna de saldo; (2) marcador explícito (`-`, parênteses, `D/C`, `CR/DB`); (3) sugestão por palavras (recebido/depósito × compra/pagamento), sempre marcada "⚠ confira". Em fatura de cartão, valor sem sinal é compra.
+- Não é IA: não interpreta imagem (PDF digitalizado é recusado com mensagem clara). Reimportar o mesmo PDF não duplica (mesma `importKey`); um mesmo lançamento vindo por PDF e depois por OFX cai na detecção de "provável duplicado".
+
 ## Segurança
 - Senha com scrypt (N=2¹⁵) + salt; sessão JWT HS256 em cookie `httpOnly`/`sameSite=lax`/`secure` (prod), 14 dias, validada no middleware (assinatura) e no servidor (versão no banco). Limite de tentativas de login em memória (instância única — aceitável para uso pessoal; em serverless considere um limitador externo).
 - Logs de erro não incluem dados financeiros. CSV neutraliza injeção de fórmulas.

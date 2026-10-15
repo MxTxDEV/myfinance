@@ -4,14 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "prisma generate && npm run db:migrate && next build",
+    "build": "prisma generate && node scripts/copy-pdf-worker.mjs && npm run db:migrate && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:migrate": "DATABASE_URL=${DATABASE_URL_UNPOOLED:-$DATABASE_URL} prisma migrate deploy",
     "db:seed-owner": "tsx scripts/seed-owner.ts",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && node scripts/copy-pdf-worker.mjs",
     "vapid": "node -e \"const k=require('web-push').generateVAPIDKeys();console.log('VAPID_PUBLIC_KEY='+k.publicKey);console.log('VAPID_PRIVATE_KEY='+k.privateKey);console.log('CRON_SECRET='+require('crypto').randomBytes(24).toString('base64url'))\""
   },
   "dependencies": {
@@ -20,6 +20,7 @@
     "jose": "^6.2.12",
     "lucide-react": "^1.57.0",
     "next": "15.5.28",
+    "pdfjs-dist": "^6.4.299",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.90.0",

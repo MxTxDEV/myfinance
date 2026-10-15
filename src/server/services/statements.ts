@@ -3,13 +3,14 @@ import { cents, dateIn } from "../convert";
 import { DomainError } from "../errors";
 import { createTransaction } from "./transactions";
 import { importKeys, looksLikeInvoicePayment, normalizeDescription, parseStatement } from "@/domain/statement";
+import { PDF_MARKER, parsePDFText, type PdfRow } from "@/domain/statement-pdf";
 import { addDays } from "@/domain/dates";
 import { z } from "zod";
 
 export type TargetKind = "account" | "card";
 export interface PreviewRow {
   key: string; date: string; description: string; amount: number; // amount em centavos, sempre positivo
-  type: "INCOME" | "EXPENSE"; categoryId: string | null;
+  type: "INCOME" | "EXPENSE"; categoryId: string | null; uncertain: boolean; // uncertain: sinal (entrada/saída) não identificado no PDF
   duplicate: "exact" | "maybe" | null; skip: boolean; note: string | null;
 }
 const MAX_CHARS = 2_000_000;
@@ -45,7 +46,16 @@ async function learnedCategories() {
 export async function previewStatement(input: { text: string; kind: TargetKind; targetId: string }) {
   const v = z.object({ text: z.string().min(1).max(MAX_CHARS), kind: z.enum(["account", "card"]), targetId: z.string().min(1) }).parse(input);
   await requireTarget(v.kind, v.targetId);
-  const parsed = parseStatement(v.text);
+  const fromPdf = v.text.includes(PDF_MARKER);
+  const parsed = fromPdf ? parsePDFText(v.text) : parseStatement(v.text);
+  // PDF sem marcador de sinal: em conta usamos a sugestão pelas palavras (e avisamos); em cartão, valor sem sinal é compra.
+  const uncertain = new Set<number>();
+  parsed.rows = parsed.rows.map((r, i) => {
+    const p = r as PdfRow;
+    if (!p.signUnknown || v.kind === "card") return r;
+    uncertain.add(i);
+    return { ...r, amount: (p.hintType === "INCOME" ? 1 : -1) * Math.abs(r.amount) };
+  });
   if (parsed.rows.length === 0) return { rows: [] as PreviewRow[], warnings: parsed.warnings, format: parsed.format };
   if (parsed.rows.length > 2000) throw new DomainError("Arquivo grande demais (máx. 2.000 linhas por importação). Divida por período.");
 
@@ -85,7 +95,9 @@ export async function previewStatement(input: { text: string; kind: TargetKind; 
       if (m) { used.add(m.id); duplicate = "maybe"; skip = true; note = "Parece já lançado por você (mesmo valor, data próxima)."; }
     }
     const cat = learned.get(`${type}|${normalizeDescription(r.description)}`)?.id ?? null;
-    return { key: keys[i].slice(`${v.kind}:${v.targetId}:`.length), date: r.date, description: r.description, amount: abs, type, categoryId: cat, duplicate, skip, note };
+    const unsure = uncertain.has(i);
+    if (unsure && !note) note = "Entrada ou saída não identificada no PDF — confira.";
+    return { key: keys[i].slice(`${v.kind}:${v.targetId}:`.length), date: r.date, description: r.description, amount: abs, type, categoryId: cat, uncertain: unsure, duplicate, skip, note };
   });
   return { rows, warnings: parsed.warnings, format: parsed.format };
 }
