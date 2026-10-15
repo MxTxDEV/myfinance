@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Landmark, RefreshCw } from "lucide-react";
 import { field } from "./form-kit";
@@ -17,6 +17,8 @@ export function BankPanel({ configured, sandbox, links, accounts, cards }: { con
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const widgetRef = useRef<{ destroy: () => Promise<unknown> | void } | null>(null);
+  const cleanup = async () => { const w = widgetRef.current; widgetRef.current = null; try { await w?.destroy(); } catch { /* já fechado */ } };
 
   const act = async (key: string, fn: () => Promise<{ ok: boolean; error?: string; data?: unknown }>, ok?: (d: unknown) => string) => {
     setBusy(key); setErr(null); setMsg(null);
@@ -29,6 +31,7 @@ export function BankPanel({ configured, sandbox, links, accounts, cards }: { con
 
   async function connect() {
     setBusy("connect"); setErr(null); setMsg(null);
+    await cleanup(); // uma conexão por vez: descarta o widget anterior (o SDK não reabre sobre um já criado)
     try {
       const t = await bankConnectToken();
       if (!t.ok || !t.data) { setErr(t.ok ? "Resposta inesperada" : t.error); setBusy(null); return; }
@@ -39,13 +42,18 @@ export function BankPanel({ configured, sandbox, links, accounts, cards }: { con
         onSuccess: async (data: { item: { id: string } }) => {
           const r = await bankRegister(data.item.id);
           if (!r.ok) setErr(r.error); else { setMsg("Banco conectado! Agora escolha onde cada conta/cartão entra e toque em Sincronizar."); router.refresh(); }
-          setBusy(null);
+          setBusy(null); void cleanup();
         },
-        onError: () => { setErr("Não foi possível conectar o banco."); setBusy(null); },
-        onClose: () => setBusy(null),
+        onError: (e) => { setErr(`Não foi possível conectar o banco${e?.message ? `: ${e.message.slice(0, 120)}` : "."}`); setBusy(null); void cleanup(); },
+        onClose: () => { setBusy(null); void cleanup(); },
       });
+      widgetRef.current = widget;
       await widget.init();
-    } catch { setErr("Não foi possível abrir a conexão com o banco."); setBusy(null); }
+    } catch (e) {
+      await cleanup();
+      setErr(`Não foi possível abrir a conexão com o banco${e instanceof Error && e.message ? ` (${e.message.slice(0, 120)})` : ""}. Feche e toque de novo; se persistir, recarregue a página.`);
+      setBusy(null);
+    }
   }
 
   if (!configured) {
