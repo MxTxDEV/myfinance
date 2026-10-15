@@ -5,7 +5,10 @@ import { accountInput, type AccountInput } from "../schemas";
 import type { Cents } from "@/domain/money";
 
 /** Efeito no saldo: + para entradas, − para saídas de caixa. */
-export const SIGN = { INCOME: 1, TRANSFER_IN: 1, EXPENSE: -1, TRANSFER_OUT: -1, INVOICE_PAYMENT: -1, DEBT_PAYMENT: -1 } as const;
+export const SIGN = {
+  INCOME: 1, TRANSFER_IN: 1, INVESTMENT_IN: 1,
+  EXPENSE: -1, TRANSFER_OUT: -1, INVOICE_PAYMENT: -1, DEBT_PAYMENT: -1, INVESTMENT_OUT: -1,
+} as const;
 
 /** Saldo atual por conta = saldo inicial + movimentações EFETIVADAS (previstas nunca contam). */
 export async function accountBalances(db: Db = prisma, onlyActive = true) {

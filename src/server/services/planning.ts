@@ -172,18 +172,22 @@ export const archiveAsset = (id: string) => prisma.asset.update({ where: { id },
  * Limite de crédito nunca entra. Bens vivem só em Asset: não são somados em duplicidade com contas.
  */
 export async function netWorthOverview(today: DateOnly = todayBR()) {
-  const [accounts, assets, debts, cards] = await Promise.all([
+  const [accounts, assets, debts, cards, investments] = await Promise.all([
     accountBalances(), prisma.asset.findMany({ where: { archivedAt: null } }),
     prisma.debt.findMany({ where: { archivedAt: null } }), cardOverview(today),
+    prisma.investment.findMany({ where: { archivedAt: null } }),
   ]);
   const unpaidInvoices = cards.reduce((s, c) => s + c.invoices.reduce((x, i) => x + i.remaining, 0), 0);
   const nw = netWorth({
-    accountBalances: accounts.map((a) => a.balance), assetValues: assets.map((a) => cents(a.value)),
+    accountBalances: accounts.map((a) => a.balance),
+    // Investimentos acompanhados no módulo próprio entram uma única vez (o aporte já saiu da conta).
+    assetValues: [...assets.map((a) => cents(a.value)), ...investments.map((i) => cents(i.currentValue))],
     debtBalances: debts.map((x) => cents(x.balance)), unpaidInvoices,
   });
   return {
     ...nw, unpaidInvoices, debts: debts.reduce((s, x) => s + cents(x.balance), 0),
     accountItems: accounts.map((a) => ({ id: a.id, name: a.name, balance: a.balance })),
+    investmentTotal: investments.reduce((s, i) => s + cents(i.currentValue), 0),
     assetItems: assets.map((a) => ({ id: a.id, name: a.name, type: a.type, value: cents(a.value), updatedAt: dateOut(a.valueUpdatedAt) })),
   };
 }

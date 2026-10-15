@@ -34,6 +34,8 @@ enum TransactionType {
   TRANSFER_OUT
   INVOICE_PAYMENT
   DEBT_PAYMENT
+  INVESTMENT_OUT // aporte: sai da conta para um investimento (não é despesa)
+  INVESTMENT_IN  // resgate: volta do investimento para a conta (não é receita)
 }
 
 // PLANNED = previsto (não afeta saldo real). SETTLED = recebido/pago (afeta saldo).
@@ -66,6 +68,24 @@ enum NotificationType {
   MONTHLY_SUMMARY
   INVOICE_CLOSING
   INVOICE_DUE
+  DAILY_MESSAGE
+}
+
+enum InvestmentType {
+  FIXED_INCOME
+  TREASURY
+  STOCKS
+  REAL_ESTATE_FUND
+  FUNDS
+  CRYPTO
+  PENSION
+  OTHER
+}
+
+enum InvestmentEntryKind {
+  CONTRIBUTION
+  WITHDRAWAL
+  VALUE_UPDATE
 }
 
 model Profile {
@@ -231,6 +251,9 @@ model Transaction {
   recurringId   String?
   occurrenceDate DateTime?        @db.Date
   debtId        String?
+  investmentId  String?
+  // Idempotência de lançamentos enviados pela fila offline (UUID gerado no aparelho).
+  clientId      String?           @unique
   deletedAt     DateTime?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
@@ -243,6 +266,7 @@ model Transaction {
   plan      InstallmentPlan? @relation(fields: [planId], references: [id])
   recurring RecurringCommitment? @relation(fields: [recurringId], references: [id])
   debt      Debt?            @relation(fields: [debtId], references: [id])
+  investment Investment?     @relation(fields: [investmentId], references: [id])
 
   // Idempotência de recorrências: uma ocorrência por (compromisso, data).
   @@unique([recurringId, occurrenceDate])
@@ -335,4 +359,51 @@ model Notification {
   createdAt DateTime         @default(now())
 
   @@index([readAt, createdAt])
+}
+
+model Investment {
+  id             String         @id @default(cuid())
+  name           String
+  type           InvestmentType
+  institution    String?
+  currentValue   Decimal        @db.Decimal(14, 2)
+  valueUpdatedAt DateTime       @db.Date
+  archivedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  entries      InvestmentEntry[]
+  transactions Transaction[]
+}
+
+// Histórico do investimento. CONTRIBUTION/WITHDRAWAL = valor movimentado (>0);
+// VALUE_UPDATE = novo valor de mercado informado pelo usuário (>=0).
+model InvestmentEntry {
+  id            String              @id @default(cuid())
+  investmentId  String
+  kind          InvestmentEntryKind
+  amount        Decimal             @db.Decimal(14, 2)
+  date          DateTime            @db.Date
+  note          String?
+  transactionId String?             @unique
+  createdAt     DateTime            @default(now())
+
+  investment Investment @relation(fields: [investmentId], references: [id])
+
+  @@index([investmentId, date])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
+
+// Garante que a mensagem das 06:00 seja enviada uma única vez por dia, mesmo com mais de um agendador.
+model PushDelivery {
+  day    String   @id // "YYYY-MM-DD" (dia das mensagens, começa às 06:00 de Brasília)
+  sentAt DateTime @default(now())
+  count  Int      @default(0)
 }

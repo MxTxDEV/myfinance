@@ -19,8 +19,13 @@ export const transactionInput = z
     payerSource: z.string().trim().max(120).optional(),
     notes: z.string().trim().max(500).optional(),
     attachmentUrl: z.string().url().optional(),
+    // UUID gerado no aparelho: torna o reenvio da fila offline idempotente.
+    clientId: z.string().uuid().optional(),
+    // Cria também um compromisso recorrente a partir desta movimentação (despesa/receita fixa).
+    repeat: z.enum(["WEEKLY", "BIWEEKLY", "MONTHLY", "YEARLY"]).optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.repeat && v.installments > 1) ctx.addIssue({ code: "custom", message: "Parcelamento não pode ser recorrente", path: ["repeat"] });
     if (v.cardId && v.accountId) ctx.addIssue({ code: "custom", message: "Escolha conta ou cartão, não ambos", path: ["cardId"] });
     if (!v.cardId && !v.accountId) ctx.addIssue({ code: "custom", message: "Escolha a conta ou o cartão", path: ["accountId"] });
     if (v.cardId && v.type === "INCOME") ctx.addIssue({ code: "custom", message: "Receitas não podem ir para cartão", path: ["cardId"] });
@@ -146,4 +151,35 @@ export const assetInput = z.object({
   value: z.number().int().min(0),
   valueUpdatedAt: isoDate,
   notes: z.string().trim().max(300).optional(),
+});
+
+export const recurringUpdate = z.object({
+  description: z.string().trim().min(1).max(120).optional(),
+  amount: money.optional(),
+  categoryId: id.optional(),
+  accountId: id.optional(),
+  endDate: isoDate.nullable().optional(),
+});
+export type RecurringUpdate = z.infer<typeof recurringUpdate>;
+
+export const investmentInput = z.object({
+  name: z.string().trim().min(1).max(80),
+  type: z.enum(["FIXED_INCOME", "TREASURY", "STOCKS", "REAL_ESTATE_FUND", "FUNDS", "CRYPTO", "PENSION", "OTHER"]),
+  institution: z.string().trim().max(60).optional(),
+  initialValue: z.number().int().min(0).max(99_999_999_999).default(0), // posição que você já tem (sem mexer em conta)
+  date: isoDate,
+});
+export type InvestmentInput = z.infer<typeof investmentInput>;
+export const investmentMoveInput = z.object({
+  investmentId: id,
+  amount: money,
+  date: isoDate,
+  accountId: id.optional(), // com conta: o dinheiro sai/entra nela; sem conta: só registra a posição
+  note: z.string().trim().max(200).optional(),
+});
+export type InvestmentMoveInput = z.infer<typeof investmentMoveInput>;
+export const investmentValueInput = z.object({
+  investmentId: id,
+  value: z.number().int().min(0).max(99_999_999_999),
+  date: isoDate,
 });

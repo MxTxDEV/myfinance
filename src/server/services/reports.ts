@@ -1,6 +1,6 @@
 import { prisma } from "../db";
 import { cents, dateOut } from "../convert";
-import { accountBalances } from "./accounts";
+import { accountBalances, SIGN } from "./accounts";
 import { cardOverview } from "./cards";
 import { addDays, addMonths, iso, monthRange, todayBR, monthKey, type DateOnly } from "@/domain/dates";
 import { savingsRate } from "@/domain/planning";
@@ -82,7 +82,7 @@ export async function yearlySeries(endKey: string = monthKey(todayBR()), months 
       select: { type: true, amount: true, date: true, accountId: true },
     }),
   ]);
-  const sign = { INCOME: 1, TRANSFER_IN: 1, EXPENSE: -1, TRANSFER_OUT: -1, INVOICE_PAYMENT: -1, DEBT_PAYMENT: -1 } as const;
+  const sign = SIGN;
   const initial = new Map(accounts.map((a) => [a.id, a]));
   const keys = Array.from({ length: months }, (_, i) => monthKey(addMonths(first, i)));
   const out = [];

@@ -28,3 +28,16 @@ export function occurrencesUntil(args: {
   }
   return out;
 }
+
+/** Equivalente mensal de um compromisso (para somar "quanto minhas contas fixas custam por mês"). */
+export function monthlyEquivalent(amount: number, kind: RecurrenceKind, intervalDays?: number): number {
+  switch (kind) {
+    case "WEEKLY": return Math.round((amount * 52) / 12);
+    case "BIWEEKLY": return Math.round((amount * 26) / 12);
+    case "MONTHLY": return amount;
+    case "YEARLY": return Math.round(amount / 12);
+    case "CUSTOM":
+      if (!intervalDays || intervalDays < 1) throw new Error("Intervalo personalizado inválido");
+      return Math.round((amount * 365) / intervalDays / 12);
+  }
+}

@@ -62,3 +62,18 @@ export function simulatePayoff(args: { balance: Cents; monthlyRate: number; paym
   }
   return { months, totalInterest: interest };
 }
+
+/**
+ * Resultado de um investimento acompanhado manualmente.
+ * Retorno total = valor atual + tudo que já foi resgatado − tudo que já foi aportado.
+ * Rentabilidade = retorno total ÷ total aportado (null se nunca houve aporte).
+ */
+export function investmentSummary(args: { contributed: Cents; withdrawn: Cents; currentValue: Cents }) {
+  const { contributed, withdrawn, currentValue } = args;
+  const totalReturn = currentValue + withdrawn - contributed;
+  return {
+    netInvested: contributed - withdrawn,
+    totalReturn,
+    returnPercent: percent(totalReturn, contributed),
+  };
+}
