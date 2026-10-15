@@ -107,11 +107,11 @@ export function PushSettings({ publicKey }: { publicKey: string | null }) {
       setSubscribed(false); setEndpoint(null);
     } finally { setBusy(false); }
   }
-  async function test() {
+  async function test(kind: "spend" | "invest" | "bill") {
     if (!endpoint) return;
     setBusy(true); setMsg(null);
     try {
-      const r = await fetch("/api/push/test", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint }) });
+      const r = await fetch("/api/push/test", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint, kind }) });
       const j = await r.json();
       setMsg(j.sent ? "Teste enviado — olhe a barra de notificações." : "O servidor não conseguiu enviar (chaves não configuradas?).");
       void playCashRegister(true);
@@ -122,13 +122,18 @@ export function PushSettings({ publicKey }: { publicKey: string | null }) {
   const btn = "rounded-md px-4 py-3 font-semibold disabled:opacity-60";
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-muted">Todo dia às 06:00 (horário de Brasília) chega uma mensagem para você pensar antes de gastar.</p>
+      <p className="text-sm text-muted">Ative para receber, neste aparelho, as mensagens do dia e os avisos de vencimento. Os horários e o que receber você organiza no menu abaixo.</p>
       {supported === false && <p className="rounded-md bg-surface-2 p-3 text-sm">Notificações push funcionam no app publicado e instalado. No iPhone: abra o site no Safari, toque em Compartilhar → <b>Adicionar à Tela de Início</b> e abra por lá (iOS 16.4+).</p>}
       {supported && !subscribed && <button disabled={busy} onClick={enable} className={`${btn} flex items-center justify-center gap-2 bg-accent text-on-accent`}><Bell className="size-5" aria-hidden />Ativar neste aparelho</button>}
       {supported && subscribed && (
-        <div className="grid grid-cols-2 gap-3">
-          <button disabled={busy} onClick={test} className={`${btn} bg-surface-2`}>Enviar teste</button>
-          <button disabled={busy} onClick={disable} className={`${btn} flex items-center justify-center gap-2 bg-surface-2`}><BellOff className="size-4" aria-hidden />Desativar</button>
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium">Enviar um teste:</p>
+          <div className="grid grid-cols-3 gap-2">
+            <button disabled={busy} onClick={() => test("spend")} className={`${btn} bg-surface-2 text-sm`}>Gastar</button>
+            <button disabled={busy} onClick={() => test("invest")} className={`${btn} bg-surface-2 text-sm`}>Investir</button>
+            <button disabled={busy} onClick={() => test("bill")} className={`${btn} bg-surface-2 text-sm`}>Vencimento</button>
+          </div>
+          <button disabled={busy} onClick={disable} className={`${btn} flex items-center justify-center gap-2 bg-surface-2`}><BellOff className="size-4" aria-hidden />Desativar neste aparelho</button>
         </div>
       )}
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-5" checked={sound} onChange={(e) => toggleSound(e.target.checked)} />Tocar a caixa registradora ao abrir a mensagem</label>

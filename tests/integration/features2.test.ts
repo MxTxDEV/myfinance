@@ -8,9 +8,8 @@ import { contribute, createInvestment, investmentsOverview, updateInvestmentValu
 import { netWorthOverview } from "@/server/services/planning";
 import { monthSummary } from "@/server/services/reports";
 import { endRecurring, fixedOverview, generateRecurring, updateRecurring } from "@/server/services/recurring";
-import { ensureDailyMessage, sendDailyPush } from "@/server/services/daily";
+import { ensureDailyMessage } from "@/server/services/daily";
 import { GET as cronGET } from "@/app/api/cron/daily/route";
-import webpush from "web-push";
 import { d } from "@/domain/dates";
 
 let s: Awaited<ReturnType<typeof seedBasics>>;
@@ -113,21 +112,6 @@ describe("mensagem das 06:00", () => {
     const a = await ensureDailyMessage(now), b = await ensureDailyMessage(now);
     expect(a.text).toBe(b.text);
     expect(await prisma.notification.count({ where: { type: "DAILY_MESSAGE" } })).toBe(1);
-  });
-  it("sem chaves VAPID, o envio é pulado sem erro", async () => {
-    delete process.env.VAPID_PUBLIC_KEY; delete process.env.VAPID_PRIVATE_KEY;
-    expect(await sendDailyPush(new Date("2026-10-15T09:00:00Z"))).toMatchObject({ sent: 0, skipped: "push-nao-configurado" });
-  });
-  it("com chaves VAPID, o envio das 06:00 acontece no máximo uma vez por dia (e limpa aparelhos mortos)", async () => {
-    const keys = webpush.generateVAPIDKeys();
-    process.env.VAPID_PUBLIC_KEY = keys.publicKey; process.env.VAPID_PRIVATE_KEY = keys.privateKey;
-    const now = new Date("2026-10-15T09:00:00Z");
-    expect(await sendDailyPush(now)).toMatchObject({ day: "2026-10-15", sent: 0 }); // sem aparelhos cadastrados
-    expect(await sendDailyPush(now)).toMatchObject({ sent: 0, skipped: "ja-enviado" });
-    expect(await prisma.pushDelivery.count()).toBe(1);
-    // outro dia envia de novo
-    expect((await sendDailyPush(new Date("2026-10-16T09:00:00Z"))).skipped).toBeUndefined();
-    delete process.env.VAPID_PUBLIC_KEY; delete process.env.VAPID_PRIVATE_KEY;
   });
   it("a rota de cron só responde com o segredo correto", async () => {
     process.env.CRON_SECRET = "segredo-de-teste-1234567890";

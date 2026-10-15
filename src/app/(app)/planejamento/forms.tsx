@@ -145,21 +145,6 @@ export function RowBtn({ label, confirm, onRun, danger }: { label: string; confi
   );
 }
 
-const TYPES: [string, string][] = [["DUE_SOON", "Vencimentos próximos"], ["OVERDUE", "Contas atrasadas"], ["BUDGET", "Limites de orçamento"], ["GOAL_STALLED", "Metas sem progresso"], ["MONTHLY_SUMMARY", "Resumo mensal"], ["INVOICE_CLOSING", "Fechamento de fatura"], ["INVOICE_DUE", "Vencimento de fatura"]];
-export function NotifyPrefsForm({ disabled, leadDays }: { disabled: string[]; leadDays: number }) {
-  const { error, done, pending, run } = useAction();
-  const [off, setOff] = useState<string[]>(disabled); const [lead, setLead] = useState(leadDays);
-  return (
-    <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); run(() => A.saveNotifyPrefs(off, lead)); }}>
-      {TYPES.map(([k, l]) => (
-        <label key={k} className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-5" checked={!off.includes(k)} onChange={(e) => setOff(e.target.checked ? off.filter((x) => x !== k) : [...off, k])} />{l}</label>
-      ))}
-      <label className="mt-1 text-sm text-muted">Avisar com antecedência de (dias)<input type="number" min={1} max={14} value={lead} onChange={(e) => setLead(Number(e.target.value))} className={`${field} mt-1`} /></label>
-      <Msg error={error} done={done} /><Submit pending={pending}>Salvar preferências</Submit>
-    </form>
-  );
-}
-
 const INV_TYPES: [string, string][] = [["FIXED_INCOME", "Renda fixa (CDB, LCI…)"], ["TREASURY", "Tesouro Direto"], ["STOCKS", "Ações"], ["REAL_ESTATE_FUND", "Fundos imobiliários"], ["FUNDS", "Fundos"], ["CRYPTO", "Cripto"], ["PENSION", "Previdência"], ["OTHER", "Outro"]];
 export const INV_LABEL = Object.fromEntries(INV_TYPES);
 

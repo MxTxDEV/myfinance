@@ -3,7 +3,7 @@
 // - Páginas (HTML e dados RSC): rede primeiro; sem internet, usa a última cópia salva no aparelho.
 // - APIs e ações (POST): nunca passam pelo cache.
 // Obs.: as páginas salvas contêm seus dados financeiros; são apagadas ao sair da conta.
-const VERSION = "v2";
+const VERSION = "v3";
 const STATIC = `fos-static-${VERSION}`;
 const PAGES = `fos-pages-${VERSION}`;
 const PRECACHE = ["/offline", "/icon.svg", "/sounds/caixa-registradora.wav"];
@@ -84,8 +84,7 @@ self.addEventListener("push", (e) => {
         body: data.body || "",
         icon: "/icon.svg",
         badge: "/icon.svg",
-        tag: "mensagem-do-dia",
-        renotify: true,
+        tag: data.tag || undefined, // cada mensagem tem a sua (não substitui a anterior)
         silent: false, // usa o som padrão do aparelho
         vibrate: [200, 100, 200],
         data: { url: data.url || "/?msg=1" },

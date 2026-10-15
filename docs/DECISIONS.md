@@ -55,8 +55,13 @@
 ## Offline
 - Cache de páginas (rede primeiro) + fila de lançamentos RECEBI/GASTEI com `clientId` único (índice único no banco): reenvio idempotente, inclusive concorrente. Pendentes **não** entram no saldo e são mostrados como pendentes. Sem edição/exclusão offline (evita conflitos).
 
-## Mensagem diária
-- O "dia" das mensagens começa às 06:00 de Brasília. Mesma data → mesma mensagem em qualquer aparelho; ordem embaralhada por ciclo. Envio protegido por `PushDelivery` (uma vez por dia). A notificação push não contém valores (tela bloqueada); os números do mês só aparecem dentro do app e respeitam "ocultar valores".
+## Mensagens e avisos por push
+- Preferências em `Profile.notifyPrefs.menu` (validadas por zod, com padrão: 06:00–22:00, manhã + 4 sorteadas, intervalo mín. 60 min, avisos 3/1/0 dias; orçamento e metas desligados por padrão para não gerar excesso).
+- **Sorteio determinístico e persistido** (`PushSlot`, único por dia+posição): mesma preferência + mesmo dia = mesmos horários; mudar a preferência refaz só o que ainda não foi enviado, respeitando o limite do dia. O "dia" é o de São Paulo; conversões usam o deslocamento real do fuso.
+- **Envio exatamente uma vez:** o horário é reservado (`sentAt`) antes de enviar; se nenhum aparelho recebeu, a reserva é desfeita e tenta no próximo tick. Horário atrasado > 2 h é marcado como pulado.
+- **Avisos de vencimento por estágio:** cada conta/fatura/dívida gera no máximo um aviso por estágio (`dueStage`: o menor estágio já alcançado), com chave de idempotência por estágio; o push sai agrupado e só dentro da janela de horário (antes disso, fica pendente até ela abrir, por até 24 h).
+- O agendador é externo (cron-job.org, a cada 5 min); o app registra um batimento (`Heartbeat`) e avisa na tela se ele parar.
+- Mensagens: as de "pense antes de gastar" são texto puro e ganham um emoji estável por mensagem; as de investir já trazem emoji. Emojis desligados são removidos no envio. Push de mensagem não contém valores financeiros.
 
 ## Segurança
 - Senha com scrypt (N=2¹⁵) + salt; sessão JWT HS256 em cookie `httpOnly`/`sameSite=lax`/`secure` (prod), 14 dias, validada no middleware (assinatura) e no servidor (versão no banco). Limite de tentativas de login em memória (instância única — aceitável para uso pessoal; em serverless considere um limitador externo).

@@ -69,6 +69,7 @@ enum NotificationType {
   INVOICE_CLOSING
   INVOICE_DUE
   DAILY_MESSAGE
+  DEBT_DUE
 }
 
 enum InvestmentType {
@@ -356,6 +357,8 @@ model Notification {
   // Evita repetição: uma notificação por chave (ex.: "budget:cat:2026-10:80").
   dedupeKey String           @unique
   readAt    DateTime?
+  // Quando o aviso virou notificação push (nulo = ainda não enviado).
+  pushedAt  DateTime?
   createdAt DateTime         @default(now())
 
   @@index([readAt, createdAt])
@@ -401,9 +404,31 @@ model PushSubscription {
   createdAt DateTime @default(now())
 }
 
-// Garante que a mensagem das 06:00 seja enviada uma única vez por dia, mesmo com mais de um agendador.
-model PushDelivery {
-  day    String   @id // "YYYY-MM-DD" (dia das mensagens, começa às 06:00 de Brasília)
-  sentAt DateTime @default(now())
-  count  Int      @default(0)
+enum PushKind {
+  MORNING // mensagem da manhã (primeira do dia)
+  SPEND   // "pense antes de gastar"
+  INVEST  // incentivo a investir
+}
+
+// Um horário sorteado do dia para uma mensagem. (day, slot) único: gerar de novo nunca duplica.
+model PushSlot {
+  id        String   @id @default(cuid())
+  day       String // "YYYY-MM-DD" (America/Sao_Paulo)
+  slot      Int
+  at        DateTime // instante do envio
+  kind      PushKind
+  message   String
+  sentAt    DateTime?
+  skipped   Boolean  @default(false) // passou muito do horário (agendador parado): não envia fora de hora
+  prefsKey  String // resumo das preferências que geraram este horário; mudou → sorteia de novo os não enviados
+  createdAt DateTime @default(now())
+
+  @@unique([day, slot])
+  @@index([day, sentAt])
+}
+
+// Batimento do agendador externo (para avisar se ele parar de chamar o servidor).
+model Heartbeat {
+  key String   @id
+  at  DateTime
 }

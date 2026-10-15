@@ -146,3 +146,37 @@ export function messageDayKey(now: Date = new Date()): string {
   const shifted = new Date(now.getTime() - 6 * 3_600_000);
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(shifted);
 }
+
+// ───────── Emojis ─────────
+// As mensagens de "pense antes de gastar" são texto puro; o emoji de abertura é escolhido de forma
+// estável a partir do próprio texto (a mesma mensagem tem sempre o mesmo emoji).
+const SPEND_EMOJIS = ["🛑", "⏳", "💸", "🧠", "🔥", "⚠️", "🎯", "💭", "🚫", "📉", "🕰️", "👀"];
+
+function hash(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
+const EMOJI_RE = /\p{Extended_Pictographic}\uFE0F?\u200D?/gu;
+/** Remove emojis (para quem desliga os emojis nas configurações). */
+export function stripEmoji(text: string): string {
+  return text.replace(EMOJI_RE, "").replace(/\s{2,}/g, " ").trim();
+}
+
+/** Aplica ou remove emoji. Mensagens que já trazem emoji (incentivo a investir) só o perdem se `emojis` for falso. */
+export function styleMessage(text: string, emojis: boolean): string {
+  const has = /^\p{Extended_Pictographic}/u.test(text);
+  if (!emojis) return has ? stripEmoji(text) : text;
+  return has ? text : `${SPEND_EMOJIS[hash(text) % SPEND_EMOJIS.length]} ${text}`;
+}
+
+/**
+ * Escolhe a mensagem de um banco por um contador (nenhuma repete antes de todas saírem).
+ * Usado para sortear mensagens ao longo do dia: contador = dia × 10 + posição.
+ */
+export function pickMessage(bank: readonly string[], counter: number): string {
+  const n = bank.length;
+  const cycle = Math.floor(counter / n);
+  return bank[cycleOrder(cycle, n)[counter % n]];
+}

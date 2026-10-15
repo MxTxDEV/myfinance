@@ -174,8 +174,38 @@ test("mensagem do dia e som de caixa registradora", async ({ page, request }) =>
   // sem segredo, o cron está fechado
   expect((await request.get("/api/cron/daily")).status()).toBe(401);
   await page.goto("/notificacoes");
-  await expect(page.getByText("Mensagem das 06:00").first()).toBeVisible();
+  await expect(page.getByText("Neste aparelho").first()).toBeVisible();
   await expect(page.getByLabel(/Tocar a caixa registradora/)).toBeChecked();
+});
+
+test("menu de notificações: organizar horários, categorias e avisos (persiste)", async ({ page }) => {
+  await login(page);
+  await page.goto("/notificacoes");
+  await expect(page.getByText("Organizar notificações")).toBeVisible();
+  await expect(page.getByText("Ainda não chamou o servidor.")).toBeVisible(); // agendador externo ainda não configurado neste ambiente
+  await page.getByLabel("Mensagens sorteadas por dia").selectOption("3");
+  await page.getByLabel("A partir de").fill("08:00");
+  await page.getByLabel("Até", { exact: true }).fill("20:00");
+  await page.getByLabel("Pense antes de gastar").uncheck();
+  await page.getByLabel(/Usar emojis/).uncheck();
+  await page.getByLabel("Faturas do cartão").uncheck();
+  await page.getByRole("button", { name: "Salvar", exact: true }).click();
+  await expect(page.getByText("Salvo ✓").first()).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel("Mensagens sorteadas por dia")).toHaveValue("3");
+  await expect(page.getByLabel("A partir de")).toHaveValue("08:00");
+  await expect(page.getByLabel("Pense antes de gastar")).not.toBeChecked();
+  await expect(page.getByLabel("Invista em vez de gastar")).toBeChecked();
+  await expect(page.getByLabel(/Usar emojis/)).not.toBeChecked();
+  await expect(page.getByLabel("Faturas do cartão")).not.toBeChecked();
+  // "Hoje": manhã às 08:00 + 3 sorteadas só de incentivo a investir, todas dentro da janela
+  const hoje = page.locator("section", { hasText: "Hoje" }).first();
+  const times = (await hoje.locator("li span.tabular-nums").allInnerTexts()).map((t) => t.replace(" ✓", ""));
+  expect(times).toHaveLength(4);
+  expect(times[0]).toBe("08:00");
+  for (const t of times) { expect(t >= "08:00" && t <= "20:00").toBe(true); }
+  await expect(hoje.getByText("Pensar antes de gastar")).toHaveCount(0);
 });
 
 test("acessibilidade: sem violações sérias nas telas principais", async ({ page }) => {

@@ -14,6 +14,8 @@ import { suggestions } from "@/server/services/ledger";
 import * as plan from "@/server/services/planning";
 import * as notif from "@/server/services/notifications";
 import * as inv from "@/server/services/investments";
+import { pushPrefsSchema } from "@/server/push-prefs";
+import { ensureSchedule } from "@/server/services/scheduler";
 import { todayBR } from "@/domain/dates";
 
 export type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
@@ -65,8 +67,14 @@ export async function removeAsset(id: string) { return run(async () => { await p
 export async function changeAssetValue(id: string, value: number, on: string) { return run(async () => { await plan.updateAssetValue(id, value, on); }); }
 export async function pauseRecurring(id: string, active: boolean) { return run(async () => { await rec.setRecurringActive(id, active); }); }
 export async function readAllNotifications() { return run(async () => { await notif.markAllRead(); }); }
-export async function saveNotifyPrefs(disabled: string[], leadDays: number) {
-  return run(async () => { const p = await assertOwner(); await prisma.profile.update({ where: { id: p.id }, data: { notifyPrefs: { disabled, leadDays } } }); });
+export async function saveNotifyMenu(v: unknown) {
+  return run(async () => {
+    const owner = await assertOwner();
+    const prefs = pushPrefsSchema.parse(v);
+    const current = (owner.notifyPrefs && typeof owner.notifyPrefs === "object" ? owner.notifyPrefs : {}) as Record<string, unknown>;
+    await prisma.profile.update({ where: { id: owner.id }, data: { notifyPrefs: { ...current, menu: prefs } } });
+    await ensureSchedule(new Date(), prefs); // reflete já na lista "Hoje"
+  });
 }
 export async function editTransfer(id: string, v: Parameters<typeof tr.updateTransfer>[1]) { return run(async () => { await tr.updateTransfer(id, v); }); }
 

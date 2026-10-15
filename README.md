@@ -43,14 +43,26 @@ O app é instalável (PWA) e funciona sem internet:
 - Ao **Sair**, as telas salvas no aparelho são apagadas.
 - O offline só existe no app publicado (build de produção); no `npm run dev` o service worker fica desligado.
 
-## Mensagem das 06:00 (push)
+## Mensagens e avisos (push)
 
-Todo dia às 06:00 (Brasília) o servidor envia uma mensagem do banco em `src/domain/messages.ts` (100 mensagens; edite/acrescente à vontade — nenhuma repete antes de todas saírem).
+O que chega no celular (tudo configurável em **Início → sino → Organizar notificações**):
+- **Mensagem da manhã** (06:00) e **mensagens sorteadas** ao longo do dia, em horários aleatórios entre 06:00 e 22:00 (janela, quantidade de 0 a 10 por dia e intervalo mínimo ajustáveis). Duas categorias: **“pense antes de gastar”** (100 mensagens, em `src/domain/messages.ts`) e **“invista em vez de gastar”** (70, em `src/domain/messages-invest.ts`), alternadas; nenhuma repete antes de todas saírem. Emojis liga/desliga.
+- **Avisos de vencimento**: contas e lançamentos previstos, faturas do cartão (fechamento e vencimento) e dívidas, 3 dias antes, 1 dia antes e no dia (escolha os momentos), mais atrasos. Vários avisos juntos viram **uma só** notificação. Orçamento, metas e resumo do mês são opcionais. Fora da janela de horário, nada é enviado.
+- Os horários sorteados do dia aparecem na tela (“Hoje”); a mensagem só é mostrada depois de enviada.
 
-1. Gere as chaves: `npm run vapid` e coloque na Vercel: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (ex.: `mailto:voce@email.com`) e `CRON_SECRET`.
-2. O agendamento diário está em `vercel.json` (`0 9 * * *` UTC = 06:00 de Brasília). **No plano Hobby da Vercel o horário do cron não é exato: roda em algum momento da hora marcada (entre 06:00 e 06:59).** Para pontualidade exata, use um agendador gratuito como o cron-job.org chamando `GET https://SEU-APP.vercel.app/api/cron/daily` às 06:00 (fuso America/Sao_Paulo) com o cabeçalho `Authorization: Bearer <CRON_SECRET>`; o envio é protegido para sair **uma única vez por dia**, mesmo com os dois agendadores ligados.
-3. No app: **Início → sino (Notificações) → Mensagem das 06:00 → Ativar neste aparelho**. No iPhone, só funciona com o app instalado na Tela de Início (iOS 16.4+).
-4. A notificação do sistema usa o som padrão do aparelho (navegadores não permitem som personalizado em push). O som de **caixa registradora** (`public/sounds/caixa-registradora.wav`) toca ao abrir a mensagem no app, no botão 🔊 e quando a notificação chega com o app aberto. Para usar o som também fora do app, no Android escolha-o nas configurações de notificação do site/app instalado.
+### Configuração (uma vez)
+1. Na Vercel, defina `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:voce@email.com`) e `CRON_SECRET` (gere com `npm run vapid`) e faça redeploy.
+2. No app: **sino → Neste aparelho → Ativar** (no iPhone, só com o app instalado na Tela de Início, iOS 16.4+). Use os botões de teste (Gastar / Investir / Vencimento).
+3. **Agendador (obrigatório para os horários aleatórios).** O plano Hobby da Vercel só agenda 1 vez por dia, então use o cron-job.org (grátis):
+   - Crie conta em cron-job.org → **Create cronjob**.
+   - **URL:** `https://SEU-APP.vercel.app/api/cron/tick` · **Schedule:** *Every 5 minutes*.
+   - Aba **Advanced → Headers:** nome `Authorization`, valor `Bearer <seu CRON_SECRET>`.
+   - Salve e clique **Test run**: deve responder `200` com `{"ok":true,…}`. Em **Notificações → Agendador** o app mostra “Ativo — última verificação há X min” (ou avisa que parou).
+   O fuso (Brasília) é tratado no servidor; o `vercel.json` mantém uma chamada diária como reserva.
+
+Garantias: cada horário é enviado **uma única vez**, mesmo com vários agendadores; se o agendador ficar parado e um horário atrasar mais de 2 h, ele é pulado (nada chega fora de hora); cada aviso de vencimento é enviado uma vez por estágio.
+
+Limites: a notificação do sistema usa o som padrão do aparelho (o som de **caixa registradora**, `public/sounds/caixa-registradora.wav`, toca ao abrir o app, no botão 🔊 e quando a notificação chega com o app aberto); push no iPhone exige app instalado; as mensagens de push nunca levam valores em reais (tela bloqueada) — exceto os avisos de vencimento, que citam a conta e o valor.
 
 ## Backup e recuperação
 

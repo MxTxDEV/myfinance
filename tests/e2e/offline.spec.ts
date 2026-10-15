@@ -13,7 +13,7 @@ test("funciona offline: abre sem internet, registra gasto pendente e sincroniza 
   // garante service worker ativo e telas pré-carregadas no aparelho
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();
-  await expect.poll(async () => page.evaluate(async () => (await (await caches.open("fos-pages-v2")).keys()).length), { timeout: 30_000 }).toBeGreaterThan(8);
+  await expect.poll(async () => page.evaluate(async () => (await (await caches.open("fos-pages-v3")).keys()).length), { timeout: 30_000 }).toBeGreaterThan(8);
   const saldoAntes = await page.getByRole("region", { name: "Saldo" }).innerText();
 
   await context.setOffline(true);
