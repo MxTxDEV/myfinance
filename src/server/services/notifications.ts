@@ -1,4 +1,4 @@
-import { prisma } from "../db";
+import { prisma, currentProfile } from "../db";
 import { cents, dateOut } from "../convert";
 import { budgetOverview, goalsOverview } from "./planning";
 import { cardOverview } from "./cards";
@@ -19,7 +19,7 @@ const br = (iso: string) => iso.split("-").reverse().join("/");
  * a cada abertura. O que gerar depende de Profile.notifyPrefs.menu (ver push-prefs.ts).
  */
 export async function generateNotifications(today: DateOnly = todayBR()) {
-  const profile = await prisma.profile.findFirst();
+  const profile = await currentProfile();
   const prefs = readPrefs(profile?.notifyPrefs);
   const stages = prefs.stages;
   const maxStage = Math.max(...stages);
@@ -110,7 +110,7 @@ async function celebrationDrafts(today: DateOnly, prev: string, prevSummary: Awa
 
 /** Gera só as conquistas (usado logo após registrar um aporte de meta ou o pagamento de uma dívida). */
 export async function generateCelebrations(today: DateOnly = todayBR(), now: Date = new Date()) {
-  const prefs = readPrefs((await prisma.profile.findFirst())?.notifyPrefs);
+  const prefs = readPrefs((await currentProfile())?.notifyPrefs);
   if (!prefs.alerts.wins) return { created: 0 };
   const prev = monthKey(addMonths(monthRange(monthKey(today)).start, -1));
   const drafts = await celebrationDrafts(today, prev, await monthSummary(prev));

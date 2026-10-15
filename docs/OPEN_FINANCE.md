@@ -1,6 +1,6 @@
 # Ligação automática com o banco (Open Finance) — plano
 
-**Situação:** ainda não implementada. O app já tem todo o "cano" por onde as transações entram sozinhas:
+**Situação:** ainda não implementada (o app agora é multiusuário: cada vínculo seria por usuário; já existe a entrada automática por chave pessoal — docs/AUTOMACAO.md). O app já tem todo o "cano" por onde as transações entram sozinhas:
 `previewStatement` → `commitStatement` → `createTransaction` com `importKey` único (idempotente). Hoje a fonte é um arquivo
 OFX/CSV; a ligação automática seria só **outra fonte** alimentando o mesmo cano.
 

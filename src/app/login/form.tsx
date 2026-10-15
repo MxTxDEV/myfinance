@@ -1,8 +1,9 @@
 "use client";
+import Link from "next/link";
 import { useActionState } from "react";
 import { login } from "./actions";
 
-export function LoginForm() {
+export function LoginForm({ signupOpen }: { signupOpen: boolean }) {
   const [state, action, pending] = useActionState(login, undefined);
   const field = "w-full rounded-md bg-surface-2 px-4 py-3.5 text-base outline-none focus-visible:ring-2 ring-accent";
   return (
@@ -17,6 +18,7 @@ export function LoginForm() {
       <button disabled={pending} className="mt-2 rounded-md bg-accent py-4 text-base font-bold text-on-accent disabled:opacity-60">
         {pending ? "Entrando…" : "Entrar"}
       </button>
+      {signupOpen && <p className="text-center text-sm text-muted">Ainda não tem conta? <Link href="/cadastro" className="font-semibold text-accent">Criar conta</Link></p>}
     </form>
   );
 }

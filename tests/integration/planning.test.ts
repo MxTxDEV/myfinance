@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/server/db";
-import { resetDb, seedBasics } from "./helpers";
+import { resetDb, seedBasics, setPrefs } from "./helpers";
 import { createTransaction } from "@/server/services/transactions";
 import { accountBalances } from "@/server/services/accounts";
 import { addGoalEntry, budgetOverview, createAsset, createDebt, createGoal, debtsOverview, goalsOverview, netWorthOverview, payDebt, upsertBudget } from "@/server/services/planning";
@@ -112,7 +112,7 @@ describe("relatórios", () => {
 
 describe("notificações", () => {
   it("são idempotentes e respeitam preferências", async () => {
-    await prisma.profile.create({ data: { email: "a@b.c", name: "A", passwordHash: "x", notifyPrefs: { menu: { alerts: { monthlySummary: false } } } } });
+    await setPrefs({ menu: { alerts: { monthlySummary: false } } });
     await createTransaction({ type: "EXPENSE", amount: 9000, description: "Luz", date: "2026-10-15", categoryId: s.food.id, accountId: s.bank.id, status: "PLANNED", installments: 1 });
     await createTransaction({ type: "EXPENSE", amount: 9000, description: "Água", date: "2026-10-10", categoryId: s.food.id, accountId: s.bank.id, status: "PLANNED", installments: 1 });
     await spend(1000, "2026-09-10");
@@ -125,7 +125,7 @@ describe("notificações", () => {
     expect(types).toEqual(["DUE_SOON", "OVERDUE"]);
   });
   it("orçamento: um alerta por limite atingido, sem repetir", async () => {
-    await prisma.profile.create({ data: { email: "o@b.c", name: "O", passwordHash: "x", notifyPrefs: { menu: { alerts: { budget: true } } } } }); // aviso de orçamento vem desligado por padrão
+    await setPrefs({ menu: { alerts: { budget: true } } }); // aviso de orçamento vem desligado por padrão
     await upsertBudget({ categoryId: s.food.id, limit: 10000, alertAt: [50, 80, 100] });
     await spend(8500, "2026-10-10");
     await generateNotifications(d(2026, 10, 14));

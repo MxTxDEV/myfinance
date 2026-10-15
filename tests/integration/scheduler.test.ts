@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import webpush from "web-push";
 import { prisma } from "@/server/db";
-import { resetDb, seedBasics } from "./helpers";
+import { resetDb, seedBasics, setPrefs } from "./helpers";
 import { setPushSender } from "@/server/push";
 import { ensureSchedule, runTick, sendAlertPushes, sendDueSlots } from "@/server/services/scheduler";
 import { generateNotifications } from "@/server/services/notifications";
@@ -150,7 +150,7 @@ describe("avisos de vencimento por push", () => {
   });
   it("respeita o que você desligou (ex.: contas)", async () => {
     await plan("Internet", "2026-10-16");
-    await prisma.profile.create({ data: { email: "a@b.c", name: "A", passwordHash: "x", notifyPrefs: { menu: { alerts: { bills: false } } } } });
+    await setPrefs({ menu: { alerts: { bills: false } } });
     await generateNotifications(d(2026, 10, 16));
     expect(await prisma.notification.count({ where: { type: { in: ["DUE_SOON", "OVERDUE"] } } })).toBe(0);
   });
@@ -166,7 +166,6 @@ describe("avisos de vencimento por push", () => {
 
 describe("agendador (tick)", () => {
   it("registra batimento, gera horários e envia; segundo tick não repete nada", async () => {
-    await prisma.profile.create({ data: { email: "a@b.c", name: "A", passwordHash: "x" } });
     const now = T("2026-10-16", "06:03");
     const r1 = await runTick(now);
     expect(r1).toMatchObject({ slots: 5, push: "ok" });
@@ -177,14 +176,13 @@ describe("agendador (tick)", () => {
     expect((await prisma.heartbeat.findUniqueOrThrow({ where: { key: "tick" } })).at.getTime()).toBe(now.getTime() + 60_000);
   });
   it("execução manual não finge ser o agendador (não grava batimento)", async () => {
-    await prisma.profile.create({ data: { email: "a@b.c", name: "A", passwordHash: "x" } });
     await runTick(T("2026-10-16", "06:03"), { manual: true });
     expect(await prisma.heartbeat.count()).toBe(0);
     await runTick(T("2026-10-16", "06:04"));
     expect(await prisma.heartbeat.count()).toBe(1);
   });
   it("pausado ou sem chaves: não envia, mas continua gerando horários e avisos", async () => {
-    await prisma.profile.create({ data: { email: "a@b.c", name: "A", passwordHash: "x", notifyPrefs: { menu: { enabled: false } } } });
+    await setPrefs({ menu: { enabled: false } });
     const r = await runTick(T("2026-10-16", "06:03"));
     expect(r).toMatchObject({ sent: 0, push: "desligado" });
     expect(sent).toHaveLength(0);

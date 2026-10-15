@@ -15,6 +15,8 @@ import * as plan from "@/server/services/planning";
 import * as notif from "@/server/services/notifications";
 import * as inv from "@/server/services/investments";
 import * as stmt from "@/server/services/statements";
+import * as accounts from "@/server/services/users";
+import * as tokens from "@/server/services/apitokens";
 import { pushPrefsSchema } from "@/server/push-prefs";
 import { celebrateNow, ensureSchedule, runTick } from "@/server/services/scheduler";
 import { dismissNotification } from "@/server/services/notifications";
@@ -92,3 +94,13 @@ export async function runTickNow() { return run(() => runTick(new Date(), { manu
 
 export async function previewStatement(v: Parameters<typeof stmt.previewStatement>[0]) { return run(() => stmt.previewStatement(v), { revalidate: false }); }
 export async function commitStatement(v: Parameters<typeof stmt.commitStatement>[0]) { return run(() => stmt.commitStatement(v)); }
+
+export async function renameMe(name: string) { return run(async () => { const p = await assertOwner(); await accounts.updateName(p.id, name); }); }
+export async function newApiToken(label: string) { return run(() => tokens.createApiToken(label)); }
+export async function removeApiToken(id: string) { return run(async () => { await tokens.revokeApiToken(id); }); }
+/** O próprio usuário apaga a conta e TODOS os dados (exige a senha) e sai. */
+export async function deleteMyAccount(password: string) {
+  const r = await run(async () => { const p = await assertOwner(); await accounts.deleteOwnAccount(p.id, password); });
+  if (r.ok) await endSession();
+  return r;
+}

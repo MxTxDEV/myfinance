@@ -26,3 +26,5 @@ Limitações: os horários aleatórios exigem um agendador externo chamando `/ap
 - Limitador de login é em memória (instância única).
 - Saldos são calculados em memória a partir das movimentações efetivadas (rápido até dezenas de milhares; para volumes maiores, mover para agregação SQL).
 - Sem fila offline: sem internet o app mostra a página offline e não registra nada.
+
+- Multiusuário + super admin + chave de lançamento automático: implementado e testado (integração e E2E). Open Finance direto: pendente de escolha de provedor.

@@ -1,4 +1,4 @@
-import { prisma } from "../db";
+import { prisma, currentProfile } from "../db";
 import { messageDayKey, messageForDay, MESSAGES, pickMessage, styleMessage } from "@/domain/messages";
 import { INVEST_MESSAGES } from "@/domain/messages-invest";
 import { MOTIVATION_MESSAGES } from "@/domain/messages-motivation";
@@ -23,7 +23,7 @@ export async function ensureDailyMessage(now: Date = new Date()) {
 /** Teste de envio só para o aparelho que pediu: mensagem de gastar, de investir ou aviso de vencimento. */
 export async function sendTestPush(endpoint: string, kind: "spend" | "invest" | "motivation" | "bill" | "win" = "spend", now: Date = new Date()) {
   if (!pushConfigured()) return { sent: 0, skipped: "push-nao-configurado" as const };
-  const prefs = readPrefs((await prisma.profile.findFirst())?.notifyPrefs);
+  const prefs = readPrefs((await currentProfile())?.notifyPrefs);
   const n = Math.floor(now.getTime() / 60_000); // varia a cada minuto
   const e = prefs.emojis;
   const payload =

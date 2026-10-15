@@ -37,6 +37,11 @@ async function learnedCategories() {
   return best;
 }
 
+/** Categoria mais usada para essa descrição (ou null). Usada pelas importações e pelos lançamentos automáticos. */
+export async function learnedCategoryFor(type: "INCOME" | "EXPENSE", description: string): Promise<string | null> {
+  return (await learnedCategories()).get(`${type}|${normalizeDescription(description)}`)?.id ?? null;
+}
+
 /**
  * Lê o arquivo e mostra o que seria importado, sem gravar nada.
  * - cartão: o sinal predominante do arquivo são as compras; o resto (pagamentos/estornos) vem desmarcado;

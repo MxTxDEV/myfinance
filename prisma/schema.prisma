@@ -35,7 +35,7 @@ enum TransactionType {
   INVOICE_PAYMENT
   DEBT_PAYMENT
   INVESTMENT_OUT // aporte: sai da conta para um investimento (não é despesa)
-  INVESTMENT_IN  // resgate: volta do investimento para a conta (não é receita)
+  INVESTMENT_IN // resgate: volta do investimento para a conta (não é receita)
 }
 
 // PLANNED = previsto (não afeta saldo real). SETTLED = recebido/pago (afeta saldo).
@@ -91,18 +91,67 @@ enum InvestmentEntryKind {
 }
 
 model Profile {
-  id              String   @id @default(cuid())
-  email           String   @unique
-  name            String
-  passwordHash    String
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  name               String
+  passwordHash       String
   // incrementa ao trocar a senha: invalida sessões antigas
-  sessionVersion  Int      @default(0)
-  theme           String   @default("system")
-  hideValues      Boolean  @default(false)
-  notifyPrefs     Json     @default("{}")
-  currency        String   @default("BRL")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  sessionVersion     Int       @default(0)
+  theme              String    @default("system")
+  hideValues         Boolean   @default(false)
+  notifyPrefs        Json      @default("{}")
+  currency           String    @default("BRL")
+  role               Role      @default(USER)
+  active             Boolean   @default(true) // desativada: não consegue entrar
+  mustChangePassword Boolean   @default(false) // senha temporária: troca obrigatória no próximo acesso
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  accounts          Account[]
+  categories        Category[]
+  transfers         Transfer[]
+  creditCards       CreditCard[]
+  invoices          Invoice[]
+  installmentPlans  InstallmentPlan[]
+  recurrings        RecurringCommitment[]
+  transactions      Transaction[]
+  budgets           Budget[]
+  goals             Goal[]
+  goalEntries       GoalEntry[]
+  debts             Debt[]
+  assets            Asset[]
+  notifications     Notification[]
+  investments       Investment[]
+  investmentEntries InvestmentEntry[]
+  pushSubscriptions PushSubscription[]
+  pushSlots         PushSlot[]
+  apiTokens         ApiToken[]
+}
+
+enum Role {
+  USER
+  SUPER_ADMIN
+}
+
+// Configurações do app inteiro (ex.: cadastro aberto). Não pertencem a nenhum usuário.
+model Setting {
+  key   String @id
+  value Json
+}
+
+// Chave para lançamentos automáticos (Atalhos do iPhone, Tasker…). Só o hash é guardado.
+model ApiToken {
+  id         String    @id @default(cuid())
+  label      String
+  tokenHash  String    @unique
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Account {
@@ -123,6 +172,12 @@ model Account {
   goals        Goal[]
   transfersOut Transfer[]    @relation("TransferFrom")
   transfersIn  Transfer[]    @relation("TransferTo")
+
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Category {
@@ -140,7 +195,12 @@ model Category {
   budgets      Budget[]
   recurrings   RecurringCommitment[]
 
-  @@unique([type, name])
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, name])
+  @@index([userId])
 }
 
 model Transfer {
@@ -158,7 +218,12 @@ model Transfer {
   toAccount    Account       @relation("TransferTo", fields: [toAccountId], references: [id])
   transactions Transaction[]
 
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([date])
+  @@index([userId])
 }
 
 model CreditCard {
@@ -174,10 +239,16 @@ model CreditCard {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  payAccount   Account            @relation(fields: [payAccountId], references: [id])
+  payAccount   Account           @relation(fields: [payAccountId], references: [id])
   invoices     Invoice[]
   transactions Transaction[]
   plans        InstallmentPlan[]
+
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // Uma fatura por cartão e mês de referência (mês em que a fatura FECHA). Ex.: "2026-10".
@@ -193,84 +264,105 @@ model Invoice {
   card         CreditCard    @relation(fields: [cardId], references: [id])
   transactions Transaction[]
 
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([cardId, referenceMonth])
   @@index([dueDate])
+  @@index([userId])
 }
 
 model InstallmentPlan {
-  id          String   @id @default(cuid())
-  cardId      String
-  description String
-  totalAmount Decimal  @db.Decimal(14, 2)
-  count       Int
+  id           String   @id @default(cuid())
+  cardId       String
+  description  String
+  totalAmount  Decimal  @db.Decimal(14, 2)
+  count        Int
   purchaseDate DateTime @db.Date
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   card         CreditCard    @relation(fields: [cardId], references: [id])
   transactions Transaction[]
+
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model RecurringCommitment {
-  id             String       @id @default(cuid())
-  description    String
-  type           CategoryType
-  amount         Decimal      @db.Decimal(14, 2)
-  categoryId     String
-  accountId      String?
-  cardId         String?
-  recurrence     Recurrence
-  intervalDays   Int?
-  startDate      DateTime     @db.Date
-  endDate        DateTime?    @db.Date
-  active         Boolean      @default(true)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id           String       @id @default(cuid())
+  description  String
+  type         CategoryType
+  amount       Decimal      @db.Decimal(14, 2)
+  categoryId   String
+  accountId    String?
+  cardId       String?
+  recurrence   Recurrence
+  intervalDays Int?
+  startDate    DateTime     @db.Date
+  endDate      DateTime?    @db.Date
+  active       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   category     Category      @relation(fields: [categoryId], references: [id])
   transactions Transaction[]
+
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Transaction {
-  id            String            @id @default(cuid())
-  type          TransactionType
-  status        TransactionStatus @default(SETTLED)
-  amount        Decimal           @db.Decimal(14, 2) // sempre positivo; o sinal vem do tipo
-  description   String
-  date          DateTime          @db.Date // data da competência / do pagamento
-  dueDate       DateTime?         @db.Date
-  settledAt     DateTime?
-  categoryId    String?
-  accountId     String? // nulo em compras no cartão (não mexe no saldo bancário)
-  cardId        String?
-  invoiceId     String?
-  payerSource   String?
-  notes         String?
-  attachmentUrl String?
-  transferId    String?
-  planId        String?
+  id                String            @id @default(cuid())
+  type              TransactionType
+  status            TransactionStatus @default(SETTLED)
+  amount            Decimal           @db.Decimal(14, 2) // sempre positivo; o sinal vem do tipo
+  description       String
+  date              DateTime          @db.Date // data da competência / do pagamento
+  dueDate           DateTime?         @db.Date
+  settledAt         DateTime?
+  categoryId        String?
+  accountId         String? // nulo em compras no cartão (não mexe no saldo bancário)
+  cardId            String?
+  invoiceId         String?
+  payerSource       String?
+  notes             String?
+  attachmentUrl     String?
+  transferId        String?
+  planId            String?
   installmentNumber Int?
-  recurringId   String?
-  occurrenceDate DateTime?        @db.Date
-  debtId        String?
-  investmentId  String?
+  recurringId       String?
+  occurrenceDate    DateTime?         @db.Date
+  debtId            String?
+  investmentId      String?
   // Idempotência de lançamentos enviados pela fila offline (UUID gerado no aparelho).
-  clientId      String?           @unique
+  clientId          String?           @unique
   // Origem em extrato importado (OFX/CSV ou, no futuro, Open Finance): reimportar o mesmo arquivo nunca duplica.
-  importKey     String?           @unique
-  deletedAt     DateTime?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  importKey         String?           @unique
+  deletedAt         DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
-  category  Category?        @relation(fields: [categoryId], references: [id])
-  account   Account?         @relation(fields: [accountId], references: [id])
-  card      CreditCard?      @relation(fields: [cardId], references: [id])
-  invoice   Invoice?         @relation(fields: [invoiceId], references: [id])
-  transfer  Transfer?        @relation(fields: [transferId], references: [id])
-  plan      InstallmentPlan? @relation(fields: [planId], references: [id])
-  recurring RecurringCommitment? @relation(fields: [recurringId], references: [id])
-  debt      Debt?            @relation(fields: [debtId], references: [id])
-  investment Investment?     @relation(fields: [investmentId], references: [id])
+  category   Category?            @relation(fields: [categoryId], references: [id])
+  account    Account?             @relation(fields: [accountId], references: [id])
+  card       CreditCard?          @relation(fields: [cardId], references: [id])
+  invoice    Invoice?             @relation(fields: [invoiceId], references: [id])
+  transfer   Transfer?            @relation(fields: [transferId], references: [id])
+  plan       InstallmentPlan?     @relation(fields: [planId], references: [id])
+  recurring  RecurringCommitment? @relation(fields: [recurringId], references: [id])
+  debt       Debt?                @relation(fields: [debtId], references: [id])
+  investment Investment?          @relation(fields: [investmentId], references: [id])
+
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Idempotência de recorrências: uma ocorrência por (compromisso, data).
   @@unique([recurringId, occurrenceDate])
@@ -280,6 +372,7 @@ model Transaction {
   @@index([categoryId, date])
   @@index([status, date])
   @@index([description])
+  @@index([userId])
 }
 
 model Budget {
@@ -291,22 +384,34 @@ model Budget {
   updatedAt  DateTime @updatedAt
 
   category Category @relation(fields: [categoryId], references: [id])
+
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Goal {
-  id            String    @id @default(cuid())
-  name          String
-  targetAmount  Decimal   @db.Decimal(14, 2)
-  targetDate    DateTime? @db.Date
-  priority      Int       @default(2)
-  description   String?
-  accountId     String?
-  archivedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  name         String
+  targetAmount Decimal   @db.Decimal(14, 2)
+  targetDate   DateTime? @db.Date
+  priority     Int       @default(2)
+  description  String?
+  accountId    String?
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  account Account?     @relation(fields: [accountId], references: [id])
+  account Account?    @relation(fields: [accountId], references: [id])
   entries GoalEntry[]
+
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // Aporte (+) ou retirada (−). Não é receita nem despesa: é reserva dentro do patrimônio.
@@ -320,24 +425,35 @@ model GoalEntry {
 
   goal Goal @relation(fields: [goalId], references: [id])
 
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([goalId, date])
+  @@index([userId])
 }
 
 model Debt {
-  id              String    @id @default(cuid())
-  name            String
-  creditor        String?
-  originalAmount  Decimal   @db.Decimal(14, 2)
-  balance         Decimal   @db.Decimal(14, 2)
-  monthlyRate     Decimal?  @db.Decimal(8, 4) // % ao mês, quando conhecida
-  installmentAmount Decimal? @db.Decimal(14, 2)
+  id                String    @id @default(cuid())
+  name              String
+  creditor          String?
+  originalAmount    Decimal   @db.Decimal(14, 2)
+  balance           Decimal   @db.Decimal(14, 2)
+  monthlyRate       Decimal?  @db.Decimal(8, 4) // % ao mês, quando conhecida
+  installmentAmount Decimal?  @db.Decimal(14, 2)
   installmentsTotal Int?
-  nextDueDate     DateTime? @db.Date
-  archivedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  nextDueDate       DateTime? @db.Date
+  archivedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   payments Transaction[]
+
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Asset {
@@ -350,6 +466,12 @@ model Asset {
   archivedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Notification {
@@ -358,13 +480,19 @@ model Notification {
   title     String
   body      String
   // Evita repetição: uma notificação por chave (ex.: "budget:cat:2026-10:80").
-  dedupeKey String           @unique
+  dedupeKey String
   readAt    DateTime?
   // Quando o aviso virou notificação push (nulo = ainda não enviado).
   pushedAt  DateTime?
   createdAt DateTime         @default(now())
 
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
   @@index([readAt, createdAt])
+  @@index([userId])
 }
 
 model Investment {
@@ -380,6 +508,12 @@ model Investment {
 
   entries      InvestmentEntry[]
   transactions Transaction[]
+
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // Histórico do investimento. CONTRIBUTION/WITHDRAWAL = valor movimentado (>0);
@@ -396,7 +530,12 @@ model InvestmentEntry {
 
   investment Investment @relation(fields: [investmentId], references: [id])
 
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([investmentId, date])
+  @@index([userId])
 }
 
 model PushSubscription {
@@ -405,30 +544,41 @@ model PushSubscription {
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
+
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 enum PushKind {
   MORNING // mensagem da manhã (primeira do dia)
-  SPEND   // "pense antes de gastar"
-  INVEST  // incentivo a investir
+  SPEND // "pense antes de gastar"
+  INVEST // incentivo a investir
   MOTIVATION // incentivo "não desista" (o que você perde se parar)
 }
 
 // Um horário sorteado do dia para uma mensagem. (day, slot) único: gerar de novo nunca duplica.
 model PushSlot {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   day       String // "YYYY-MM-DD" (America/Sao_Paulo)
   slot      Int
   at        DateTime // instante do envio
   kind      PushKind
   message   String
   sentAt    DateTime?
-  skipped   Boolean  @default(false) // passou muito do horário (agendador parado): não envia fora de hora
+  skipped   Boolean   @default(false) // passou muito do horário (agendador parado): não envia fora de hora
   prefsKey  String // resumo das preferências que geraram este horário; mudou → sorteia de novo os não enviados
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  @@unique([day, slot])
+  // Dono dos dados: preenchido automaticamente pelo cliente com escopo de usuário (src/server/db.ts).
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day, slot])
   @@index([day, sentAt])
+  @@index([userId])
 }
 
 // Batimento do agendador externo (para avisar se ele parar de chamar o servidor).

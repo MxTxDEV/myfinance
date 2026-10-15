@@ -1,6 +1,6 @@
 # Finance OS
 
-Sistema financeiro pessoal (usuário único), mobile-first e instalável como PWA.
+Sistema financeiro pessoal **multiusuário** (cada pessoa só vê os próprios dados; um super administrador gerencia as contas), mobile-first e instalável como PWA.
 **RECEBI** e **GASTEI** a um toque; contas, cartões, faturas, parcelas, recorrências, orçamento, metas, dívidas, patrimônio e relatórios.
 
 Stack: Next.js 15 (App Router) · TypeScript · Tailwind v4 · PostgreSQL · Prisma 6 · Zod · Recharts · Lucide · Vitest · Playwright.
@@ -11,11 +11,20 @@ Stack: Next.js 15 (App Router) · TypeScript · Tailwind v4 · PostgreSQL · Pri
 cp .env.example .env            # preencha DATABASE_URL e AUTH_SECRET (openssl rand -base64 48)
 npm install
 npm run db:migrate              # aplica as migrações
-OWNER_EMAIL=voce@email.com OWNER_NAME="Seu Nome" OWNER_PASSWORD='uma-senha-longa' npm run db:seed-owner
+SUPERADMIN_EMAIL=voce@email.com SUPERADMIN_PASSWORD='senha-temporaria-longa' npm run db:bootstrap
 npm run dev
 ```
 
-`db:seed-owner` cria (ou troca a senha d)o proprietário e as categorias padrão. **Não há cadastro público**: só existe o proprietário criado por esse comando. Trocar a senha invalida todas as sessões.
+`db:bootstrap` (roda também no `npm run build`/deploy) cria o **super administrador** a partir de `SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD`. A senha é temporária: no primeiro acesso o app exige trocá-la. Se já existir um administrador, nada é sobrescrito (use `SUPERADMIN_FORCE_RESET=1` se esquecer a senha). Se houver dados da versão de usuário único, a conta mais antiga é promovida a administrador e **fica com esses dados**.
+
+## Contas e administração
+- **Cadastro público** em `/cadastro` (pode ser desligado em **Perfil → Painel do administrador**). Sem serviço de e-mail: quem esquecer a senha pede ao administrador, que gera uma senha temporária (a troca é exigida no acesso seguinte).
+- **Painel `/admin`** (só super admin): lista contas (só contagem de lançamentos — **nunca valores ou descrições**), cria contas com senha temporária, desativa/reativa, gera nova senha, exclui conta e todos os dados dela.
+- **Isolamento:** toda tabela de dados tem `userId`; o acesso passa por um cliente Prisma com escopo (`src/server/db.ts`) que injeta o usuário da sessão em toda consulta e **falha** se não houver usuário. Testes em `tests/integration/multiuser.test.ts`.
+- Cada pessoa pode excluir a própria conta e todos os dados (Perfil → Conta).
+
+## Lançamento automático (cartão/banco)
+Veja [docs/AUTOMACAO.md](docs/AUTOMACAO.md): chave pessoal + endpoint `POST /api/ingest/transaction` para Atalhos do iPhone/Tasker. Ligação direta com o banco (Open Finance) depende de um provedor: [docs/OPEN_FINANCE.md](docs/OPEN_FINANCE.md).
 
 ## Testes
 
@@ -31,7 +40,7 @@ Os testes de integração/E2E usam o banco `finance_os_test` (crie com `createdb
 
 1. Crie um Postgres gerenciado (Neon, Supabase, Vercel Postgres) com backup/PITR habilitado.
 2. Na Vercel, defina `DATABASE_URL` e `AUTH_SECRET` (somente no servidor; nada vai para o frontend).
-3. Rode `npm run db:migrate` e `npm run db:seed-owner` uma vez apontando para o banco de produção.
+3. Defina `SUPERADMIN_EMAIL` e `SUPERADMIN_PASSWORD` (temporária). O build aplica as migrações e cria o administrador. **Não** defina `AUTH_DISABLED` (removido): o login é sempre exigido.
 4. HTTPS é automático na Vercel; o app envia HSTS, CSP, `X-Frame-Options: DENY` e demais headers (`next.config.ts`).
 
 ## Importar extrato do banco e fatura do cartão

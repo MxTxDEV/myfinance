@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getOwner } from "@/server/auth";
+import { signupOpen } from "@/server/services/users";
 import { LoginForm } from "./form";
 
 export default async function LoginPage() {
@@ -10,7 +11,7 @@ export default async function LoginPage() {
         <h1 className="text-3xl font-bold tracking-tight">Finance OS</h1>
         <p className="mt-1 text-muted">Entre para ver suas finanças.</p>
       </div>
-      <LoginForm />
+      <LoginForm signupOpen={await signupOpen()} />
     </main>
   );
 }

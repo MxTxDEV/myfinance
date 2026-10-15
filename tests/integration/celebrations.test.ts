@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import webpush from "web-push";
 import { prisma } from "@/server/db";
-import { resetDb, seedBasics } from "./helpers";
+import { resetDb, seedBasics, setPrefs } from "./helpers";
 import { setPushSender } from "@/server/push";
 import { celebrateNow, sendAlertPushes } from "@/server/services/scheduler";
 import { generateNotifications, recentCelebrations } from "@/server/services/notifications";
@@ -72,7 +72,7 @@ describe("parabéns por conquistas", () => {
     expect(await celebrations()).toHaveLength(0);
   });
   it("pode ser desligado no menu", async () => {
-    await prisma.profile.create({ data: { email: "a@b.c", name: "A", passwordHash: "x", notifyPrefs: { menu: { alerts: { wins: false } } } } });
+    await setPrefs({ menu: { alerts: { wins: false } } });
     const g = await createGoal({ name: "Reserva", targetAmount: 1000, priority: 1 });
     await addGoalEntry({ goalId: g.id, amount: 1000, date: "2026-10-10" });
     await generateNotifications(today);

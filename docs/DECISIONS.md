@@ -82,3 +82,10 @@
 
 ## Dados de demonstração
 Não há dados de demonstração nem fictícios no sistema. Valores como "R$ 4.600,00" aparecem apenas nos layouts do Figma, identificados como exemplo.
+
+## Multiusuário e super administrador
+- Isolamento por `userId` em 18 tabelas + cliente Prisma com escopo (extensão de consulta) que injeta/filtra o usuário e **falha sem usuário** (fail-closed). `prismaRaw` (sem escopo) só em auth, admin, agendador e scripts.
+- O usuário do contexto vem de `AsyncLocalStorage` (`runAs`: cron/testes) ou, em requisições, do **cookie de sessão assinado** conferido no banco (cache de 10 s) — `enterWith` não propaga ao chamador após `await`, por isso não é a fonte única.
+- Dados legados (modo aberto) passam à conta mais antiga, promovida a super admin por `scripts/bootstrap-admin.ts` (migração com backfill testada em dois cenários).
+- Admin nunca vê valores/descrições (só contagens). Redefinição de senha pelo admin (senha temporária + troca obrigatória), sem e-mail. Cadastro público com limite por IP e botão para fechar.
+- Chave de lançamento automático: hash sha256, só cria lançamentos, idempotente.

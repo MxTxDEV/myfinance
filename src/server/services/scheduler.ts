@@ -1,5 +1,5 @@
 import type { NotificationType, PushKind, PushSlot } from "@prisma/client";
-import { prisma } from "../db";
+import { prisma, prismaRaw, currentProfile, runAs } from "../db";
 import { readPrefs, prefsKey, type PushPrefs } from "../push-prefs";
 import { pushConfigured, sendToAll } from "../push";
 import { ensureDailyMessage } from "./daily";
@@ -33,7 +33,7 @@ export async function ensureSchedule(now: Date, prefs: PushPrefs): Promise<PushS
   if (stale) await prisma.pushSlot.deleteMany({ where: { day, sentAt: null, skipped: false } });
 
   const start = parseHHMM(prefs.windowStart)!, end = parseHHMM(prefs.windowEnd)!;
-  const rows: Omit<PushSlot, "id" | "createdAt" | "sentAt" | "skipped">[] = [];
+  const rows: Omit<PushSlot, "id" | "createdAt" | "sentAt" | "skipped" | "userId">[] = [];
   let slot = used.reduce((m, s) => Math.max(m, s.slot), -1) + 1;
 
   if (prefs.morning && !used.some((s) => s.kind === "MORNING")) {
@@ -129,7 +129,7 @@ export async function sendAlertPushes(now: Date, prefs: PushPrefs, opts: { only?
 export async function runTick(now: Date = new Date(), opts: { manual?: boolean } = {}) {
   // Execução manual (botão "Rodar agora") não conta como batimento: o status do agendador externo continua honesto.
   if (!opts.manual) await prisma.heartbeat.upsert({ where: { key: "tick" }, update: { at: now }, create: { key: "tick", at: now } });
-  const profile = await prisma.profile.findFirst();
+  const profile = await currentProfile();
   const prefs = readPrefs(profile?.notifyPrefs);
   const { day } = localParts(now);
   const today = parseISODate(day);
@@ -146,9 +146,31 @@ export async function runTick(now: Date = new Date(), opts: { manual?: boolean }
 export async function celebrateNow(now: Date = new Date()) {
   try {
     await generateCelebrations(parseISODate(localParts(now).day), now);
-    const prefs = readPrefs((await prisma.profile.findFirst())?.notifyPrefs);
+    const prefs = readPrefs((await currentProfile())?.notifyPrefs);
     if (prefs.enabled && pushConfigured()) await sendAlertPushes(now, prefs, { only: ["CELEBRATION"] });
   } catch (e) {
     console.error("celebrateNow falhou", e instanceof Error ? e.name : "erro");
   }
+}
+
+/**
+ * Chamado pelo agendador externo: atende CADA usuário que ativou notificações (tem inscrição push), sempre dentro
+ * do contexto dele — nenhum dado cruza entre contas. Um erro em uma conta não impede as outras.
+ */
+export async function runTickAll(now: Date = new Date()) {
+  await prismaRaw.heartbeat.upsert({ where: { key: "tick" }, update: { at: now }, create: { key: "tick", at: now } });
+  const subs = await prismaRaw.pushSubscription.groupBy({ by: ["userId"] });
+  const users = await prismaRaw.profile.findMany({ where: { id: { in: subs.map((x) => x.userId) }, active: true }, select: { id: true } });
+  let sent = 0, alerts = 0, failed = 0;
+  for (const u of users) {
+    try {
+      const r = await runAs(u.id, () => runTick(now, { manual: true })); // o batimento já foi registrado acima
+      sent += r.sent ?? 0;
+      alerts += r.alerts ?? 0;
+    } catch (e) {
+      failed++;
+      console.error("tick falhou para um usuário", e instanceof Error ? e.name : "erro"); // sem dados financeiros nos logs
+    }
+  }
+  return { users: users.length, sent, alerts, failed };
 }
