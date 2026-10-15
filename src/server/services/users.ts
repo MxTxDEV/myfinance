@@ -74,9 +74,10 @@ export async function listUsers() {
     prismaRaw.transaction.groupBy({ by: ["userId"], _count: { _all: true }, where: { deletedAt: null } }),
   ]);
   const counts = new Map(tx.map((t) => [t.userId, t._count._all]));
+  const acc = new Map((await prismaRaw.account.groupBy({ by: ["userId"], _count: { _all: true } })).map((t) => [t.userId, t._count._all]));
   return users.map((u) => ({
     id: u.id, name: u.name, email: u.email, role: u.role, active: u.active, mustChangePassword: u.mustChangePassword,
-    createdAt: u.createdAt.toISOString(), lastLoginAt: u.lastLoginAt?.toISOString() ?? null, transactions: counts.get(u.id) ?? 0,
+    createdAt: u.createdAt.toISOString(), lastLoginAt: u.lastLoginAt?.toISOString() ?? null, transactions: counts.get(u.id) ?? 0, accounts: acc.get(u.id) ?? 0,
   }));
 }
 
@@ -109,20 +110,44 @@ export async function adminResetPassword(adminId: string, userId: string) {
  * Apaga TODOS os dados do usuário e a conta. Ordem importa por causa das chaves estrangeiras:
  * primeiro o que depende de outras coisas, por último contas/categorias.
  */
+type Tx = Parameters<Parameters<typeof prismaRaw.$transaction>[0]>[0];
+async function wipeData(tx: Tx, userId: string) {
+  const w = { where: { userId } };
+  await tx.bankLinkAccount.deleteMany(w); await tx.bankLink.deleteMany(w);
+  await tx.transaction.deleteMany(w);
+  await tx.goalEntry.deleteMany(w); await tx.goal.deleteMany(w);
+  await tx.budget.deleteMany(w);
+  await tx.investmentEntry.deleteMany(w); await tx.investment.deleteMany(w);
+  await tx.debt.deleteMany(w); await tx.asset.deleteMany(w);
+  await tx.installmentPlan.deleteMany(w); await tx.invoice.deleteMany(w);
+  await tx.recurringCommitment.deleteMany(w); await tx.creditCard.deleteMany(w);
+  await tx.transfer.deleteMany(w); await tx.category.deleteMany(w); await tx.account.deleteMany(w);
+  await tx.notification.deleteMany(w); await tx.pushSlot.deleteMany(w); await tx.pushSubscription.deleteMany(w); await tx.apiToken.deleteMany(w);
+}
 export async function deleteUserAndData(userId: string) {
+  await prismaRaw.$transaction(async (tx) => { await wipeData(tx, userId); await tx.profile.delete({ where: { id: userId } }); }, { timeout: 60_000 });
+}
+
+/**
+ * Passa TODOS os dados de outra conta (ex.: a conta do tempo do modo aberto) para o administrador.
+ * Só é permitido se a conta do administrador ainda não tem lançamentos (o que ela tem — categorias padrão, contas vazias — é descartado).
+ * Os ids não mudam, então todos os vínculos (fatura↔cartão, meta↔conta…) continuam corretos. A conta de origem fica vazia.
+ */
+export async function transferDataToAdmin(adminId: string, fromId: string) {
+  if (fromId === adminId) throw new DomainError("Escolha outra conta como origem.");
+  const [from, to] = await Promise.all([prismaRaw.profile.findUnique({ where: { id: fromId } }), prismaRaw.profile.findUnique({ where: { id: adminId } })]);
+  if (!from || !to || to.role !== "SUPER_ADMIN") throw new DomainError("Conta não encontrada.");
+  if ((await prismaRaw.transaction.count({ where: { userId: adminId } })) > 0) throw new DomainError("Sua conta de administrador já tem lançamentos; para não misturar, a transferência só é feita para uma conta vazia.");
   await prismaRaw.$transaction(async (tx) => {
-    const w = { where: { userId } };
-    await tx.bankLinkAccount.deleteMany(w); await tx.bankLink.deleteMany(w);
-    await tx.transaction.deleteMany(w);
-    await tx.goalEntry.deleteMany(w); await tx.goal.deleteMany(w);
-    await tx.budget.deleteMany(w);
-    await tx.investmentEntry.deleteMany(w); await tx.investment.deleteMany(w);
-    await tx.debt.deleteMany(w); await tx.asset.deleteMany(w);
-    await tx.installmentPlan.deleteMany(w); await tx.invoice.deleteMany(w);
-    await tx.recurringCommitment.deleteMany(w); await tx.creditCard.deleteMany(w);
-    await tx.transfer.deleteMany(w); await tx.category.deleteMany(w); await tx.account.deleteMany(w);
-    await tx.notification.deleteMany(w); await tx.pushSlot.deleteMany(w); await tx.pushSubscription.deleteMany(w); await tx.apiToken.deleteMany(w);
-    await tx.profile.delete({ where: { id: userId } });
+    await wipeData(tx, adminId);
+    const set = { where: { userId: fromId }, data: { userId: adminId } };
+    await tx.account.updateMany(set); await tx.category.updateMany(set); await tx.transfer.updateMany(set); await tx.creditCard.updateMany(set);
+    await tx.invoice.updateMany(set); await tx.installmentPlan.updateMany(set); await tx.recurringCommitment.updateMany(set);
+    await tx.transaction.updateMany(set); await tx.budget.updateMany(set); await tx.goal.updateMany(set); await tx.goalEntry.updateMany(set);
+    await tx.debt.updateMany(set); await tx.asset.updateMany(set); await tx.notification.updateMany(set); await tx.investment.updateMany(set);
+    await tx.investmentEntry.updateMany(set); await tx.pushSubscription.updateMany(set); await tx.pushSlot.updateMany(set);
+    await tx.apiToken.updateMany(set); await tx.bankLink.updateMany(set); await tx.bankLinkAccount.updateMany(set);
+    if (from.notifyPrefs) await tx.profile.update({ where: { id: adminId }, data: { notifyPrefs: from.notifyPrefs as object } });
   }, { timeout: 60_000 });
 }
 

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Copy } from "lucide-react";
 import { field } from "@/components/form-kit";
-import { adminAddUser, adminRemoveUser, adminResetPassword, adminSetActive, adminSetSignup } from "./actions";
+import { adminAddUser, adminRemoveUser, adminResetPassword, adminSetActive, adminSetSignup, adminTransferData } from "./actions";
 
 function TempPassword({ email, value, onClose }: { email: string; value: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -44,7 +44,7 @@ export function AddUserForm() {
   );
 }
 
-export function UserActions({ id, email, active, isSelf, isAdmin }: { id: string; email: string; active: boolean; isSelf: boolean; isAdmin: boolean }) {
+export function UserActions({ id, email, active, isSelf, isAdmin, hasData }: { id: string; email: string; active: boolean; isSelf: boolean; isAdmin: boolean; hasData: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
   const [temp, setTemp] = useState<string | null>(null);
@@ -59,8 +59,9 @@ export function UserActions({ id, email, active, isSelf, isAdmin }: { id: string
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex flex-wrap justify-end">
+        {!isSelf && hasData && <button disabled={busy} className={`${btn} text-accent`} onClick={() => { if (window.confirm(`Trazer TODOS os dados de ${email} para a sua conta de administrador? O que a sua conta tem hoje (categorias padrão, contas vazias) será substituído.`)) void run(() => adminTransferData(id)); }}>Trazer dados para mim</button>}
         {!isSelf && <button disabled={busy} className={`${btn} text-accent`} onClick={() => run(() => adminSetActive(id, !active))}>{active ? "Desativar" : "Reativar"}</button>}
-        {(!isAdmin || isSelf) && !isSelf && <button disabled={busy} className={`${btn} text-accent`} onClick={() => { if (window.confirm(`Gerar nova senha temporária para ${email}? As sessões dela serão encerradas.`)) void run(() => adminResetPassword(id), (d) => setTemp((d as { tempPassword: string }).tempPassword)); }}>Nova senha</button>}
+        {!isAdmin && <button disabled={busy} className={`${btn} text-accent`} onClick={() => { if (window.confirm(`Gerar nova senha temporária para ${email}? As sessões dela serão encerradas.`)) void run(() => adminResetPassword(id), (d) => setTemp((d as { tempPassword: string }).tempPassword)); }}>Nova senha</button>}
         {!isAdmin && <button disabled={busy} className={`${btn} text-expense`} onClick={() => { if (window.confirm(`Excluir ${email} e TODOS os dados financeiros dela? Isso não pode ser desfeito.`)) void run(() => adminRemoveUser(id)); }}>Excluir</button>}
       </div>
       {error && <p role="alert" className="max-w-56 text-right text-xs text-expense">{error}</p>}

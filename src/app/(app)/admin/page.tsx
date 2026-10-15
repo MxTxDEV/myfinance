@@ -30,8 +30,8 @@ export default async function AdminPage() {
                   {u.mustChangePassword && <span className="rounded-full bg-surface-2 px-2 py-0.5 font-semibold">Senha temporária</span>}
                 </div>
               </div>
-              <p className="text-xs text-muted">Criada em {when(u.createdAt)} · último acesso: {when(u.lastLoginAt)} · {u.transactions} lançamentos</p>
-              <UserActions id={u.id} email={u.email} active={u.active} isSelf={u.id === admin.id} isAdmin={u.role === "SUPER_ADMIN"} />
+              <p className="text-xs text-muted">Criada em {when(u.createdAt)} · último acesso: {when(u.lastLoginAt)} · {u.accounts} contas · {u.transactions} lançamentos</p>
+              <UserActions id={u.id} email={u.email} active={u.active} isSelf={u.id === admin.id} isAdmin={u.role === "SUPER_ADMIN"} hasData={u.transactions > 0 || u.accounts > 0} />
             </li>
           ))}
         </ul>

@@ -6,7 +6,7 @@ import { setPushSender } from "@/server/push";
 import { accountBalances } from "@/server/services/accounts";
 import { createTransaction } from "@/server/services/transactions";
 import { upsertBudget, createDebt } from "@/server/services/planning";
-import { adminCreateUser, adminDeleteUser, adminResetPassword, changePassword, checkPassword, createUser, deleteOwnAccount, setSignupOpen, setUserActive, signup } from "@/server/services/users";
+import { transferDataToAdmin, adminCreateUser, adminDeleteUser, adminResetPassword, changePassword, checkPassword, createUser, deleteOwnAccount, setSignupOpen, setUserActive, signup } from "@/server/services/users";
 import { createApiToken, ingestTransaction, userForToken } from "@/server/services/apitokens";
 import { runTickAll } from "@/server/services/scheduler";
 
@@ -129,6 +129,23 @@ describe("contas e senhas", () => {
       expect(await (prismaRaw[model] as unknown as { count: (a: object) => Promise<number> }).count({ where: { userId: v.id } })).toBe(0);
     }
     expect(await prismaRaw.transaction.count({ where: { userId: a.id } })).toBe(1); // A intacto
+  });
+});
+
+describe("transferir dados para o admin", () => {
+  it("move tudo da conta antiga para o admin vazio, preservando vínculos, e recusa admin com lançamentos", async () => {
+    await tx(s.bank.id, s.food.id, 777); // dados na conta A (legado)
+    await createDebt({ name: "Dívida", totalAmount: 100000, monthlyPayment: 10000, dueDay: 5, interestRate: 1 } as never).catch(() => undefined);
+    const admin = await createUser({ name: "Adm", email: "adm@example.com", password: "senha-admin-longa", role: "SUPER_ADMIN" });
+    const before = await prismaRaw.transaction.count({ where: { userId: a.id } });
+    await expect(transferDataToAdmin(admin.id, admin.id)).rejects.toThrow();
+    await transferDataToAdmin(admin.id, a.id);
+    expect(await prismaRaw.transaction.count({ where: { userId: admin.id } })).toBe(before);
+    expect(await prismaRaw.transaction.count({ where: { userId: a.id } })).toBe(0);
+    expect(await prismaRaw.account.count({ where: { userId: a.id } })).toBe(0);
+    const t = await runAs(admin.id, () => accountBalances());
+    expect(t.find((x) => x.name === "Conta")?.balance).toBe(100000 - 777);
+    await expect(transferDataToAdmin(admin.id, a.id)).rejects.toThrow(/já tem lançamentos/); // não mistura com dados existentes
   });
 });
 

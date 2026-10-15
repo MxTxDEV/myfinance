@@ -28,3 +28,4 @@ export async function adminSetActive(userId: string, active: boolean) { return g
 export async function adminResetPassword(userId: string) { return guard((a) => users.adminResetPassword(a, userId)); }
 export async function adminRemoveUser(userId: string) { return guard((a) => users.adminDeleteUser(a, userId)); }
 export async function adminSetSignup(open: boolean) { return guard(async () => { await users.setSignupOpen(open); }); }
+export async function adminTransferData(fromId: string) { return guard((a) => users.transferDataToAdmin(a, fromId)); }
