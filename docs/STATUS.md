@@ -28,3 +28,4 @@ Limitações: os horários aleatórios exigem um agendador externo chamando `/ap
 - Sem fila offline: sem internet o app mostra a página offline e não registra nada.
 
 - Multiusuário + super admin + chave de lançamento automático: implementado e testado (integração e E2E). Open Finance direto: pendente de escolha de provedor.
+- Pluggy (Open Finance): implementado (widget, mapeamento, sincronização idempotente, webhook, reconciliação); testes com API simulada. Falta validar em sandbox com credenciais reais.

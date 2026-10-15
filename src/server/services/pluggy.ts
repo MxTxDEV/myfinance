@@ -208,7 +208,7 @@ async function importOne(la: LA, t: PTx, hasCard: boolean): Promise<"ok" | "dup"
   // Já lançado por outro meio (à mão, atalho)? mesmo valor no mesmo destino em ±1 dia → não duplica.
   const d0 = new Date(`${date}T00:00:00Z`);
   const near = await prisma.transaction.findFirst({
-    where: { deletedAt: null, type, amount: (cents / 100).toFixed(2), date: { gte: new Date(d0.getTime() - DAY), lte: new Date(d0.getTime() + DAY) }, ...(la.cardId ? { cardId: la.cardId } : { accountId: la.accountId! }), NOT: { importKey: { startsWith: "pluggy:" } } },
+    where: { deletedAt: null, type, amount: (cents / 100).toFixed(2), date: { gte: new Date(d0.getTime() - DAY), lte: new Date(d0.getTime() + DAY) }, ...(la.cardId ? { cardId: la.cardId } : { accountId: la.accountId! }), OR: [{ importKey: null }, { NOT: { importKey: { startsWith: "pluggy:" } } }] },
   });
   if (near) return "dup";
 

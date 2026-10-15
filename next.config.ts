@@ -8,7 +8,8 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self'",
+  "connect-src 'self' https://*.pluggy.ai",
+  "frame-src https://*.pluggy.ai", // widget de conexão bancária (Open Finance); o banco é autorizado lá, nunca no app
   "worker-src 'self' blob:", // leitura de PDF (pdf.js) roda em um worker do próprio site
   "frame-ancestors 'none'",
   "base-uri 'self'",

@@ -17,7 +17,8 @@ const als = new AsyncLocalStorage<{ userId: string }>();
 let testUserId: string | null = null;
 
 export const enterUser = (userId: string) => als.enterWith({ userId });
-export const runAs = <T>(userId: string, fn: () => T): T => als.run({ userId }, fn);
+/** Executa `fn` como o usuário. O `await` interno garante que consultas Prisma (promessas preguiçosas) rodem DENTRO do contexto. */
+export const runAs = <T>(userId: string, fn: () => T | PromiseLike<T>): Promise<T> => als.run({ userId }, async () => await fn());
 /** Somente testes (Vitest): define o usuário padrão do contexto. Recusado fora de testes. */
 export function __setTestUser(userId: string | null) {
   if (!process.env.VITEST) throw new Error("__setTestUser só pode ser usado em testes");

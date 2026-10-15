@@ -7,6 +7,8 @@ import { Money } from "@/components/privacy";
 import { Card, Empty } from "@/components/ui";
 import { ImportStatement } from "@/components/import-statement";
 import { AccountPanel, AutomationPanel } from "@/components/account-panel";
+import { BankPanel } from "@/components/bank-panel";
+import { listLinks, pluggyConfigured } from "@/server/services/pluggy";
 import { listApiTokens } from "@/server/services/apitokens";
 import { archiveAccount, archiveCard, archiveCategory, favoriteCategory } from "../actions";
 import { AccountForm, CardForm, CategoryForm, LogoutButton, PayInvoiceForm, RowAction, ThemeSelect, TransferForm } from "./forms";
@@ -17,10 +19,10 @@ export default async function Perfil() {
   const owner = await requireOwner();
   const today = todayBR();
   const iso = today.toISOString().slice(0, 10);
-  const [accounts, cards, categories, tokens] = await Promise.all([
+  const [accounts, cards, categories, tokens, links] = await Promise.all([
     accountBalances(), cardOverview(today),
     prisma.category.findMany({ where: { archivedAt: null }, orderBy: [{ type: "asc" }, { favorite: "desc" }, { name: "asc" }] }),
-    listApiTokens(),
+    listApiTokens(), listLinks(),
   ]);
   const det = "group rounded-md border border-border bg-surface";
   const sm = "flex cursor-pointer items-center justify-between p-4 font-bold";
@@ -109,6 +111,10 @@ export default async function Perfil() {
       </details>
 
       <Card title="Conta"><AccountPanel name={owner.name} email={owner.email} isAdmin={owner.role === "SUPER_ADMIN"} /></Card>
+
+      <Card title="Banco e cartão (Open Finance)">
+        <BankPanel configured={pluggyConfigured()} sandbox={process.env.PLUGGY_SANDBOX === "1"} links={links} accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} cards={cards.map((c) => ({ id: c.id, name: c.name }))} />
+      </Card>
 
       <Card title="Lançamento automático"><AutomationPanel tokens={tokens.map((t) => ({ id: t.id, label: t.label, createdAt: t.createdAt.toISOString(), lastUsedAt: t.lastUsedAt?.toISOString() ?? null }))} /></Card>
 

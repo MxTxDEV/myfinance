@@ -89,3 +89,7 @@ Não há dados de demonstração nem fictícios no sistema. Valores como "R$ 4.6
 - Dados legados (modo aberto) passam à conta mais antiga, promovida a super admin por `scripts/bootstrap-admin.ts` (migração com backfill testada em dois cenários).
 - Admin nunca vê valores/descrições (só contagens). Redefinição de senha pelo admin (senha temporária + troca obrigatória), sem e-mail. Cadastro público com limite por IP e botão para fechar.
 - Chave de lançamento automático: hash sha256, só cria lançamentos, idempotente.
+
+## Open Finance (Pluggy)
+- Agregador autorizado; o app nunca vê credenciais do banco. Item conferido por `clientUserId` (anti-IDOR). Sincronização idempotente por `importKey pluggy:<id>`, com dedupe contra lançamentos manuais. Webhook com segredo na URL e sem confiar no corpo.
+- `runAs` agora aguarda a função (promessas do Prisma são preguiçosas e rodariam fora do contexto).

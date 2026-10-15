@@ -24,7 +24,7 @@ npm run dev
 - Cada pessoa pode excluir a própria conta e todos os dados (Perfil → Conta).
 
 ## Lançamento automático (cartão/banco)
-Veja [docs/AUTOMACAO.md](docs/AUTOMACAO.md): chave pessoal + endpoint `POST /api/ingest/transaction` para Atalhos do iPhone/Tasker. Ligação direta com o banco (Open Finance) depende de um provedor: [docs/OPEN_FINANCE.md](docs/OPEN_FINANCE.md).
+Veja [docs/AUTOMACAO.md](docs/AUTOMACAO.md): chave pessoal + endpoint `POST /api/ingest/transaction` para Atalhos do iPhone/Tasker. Ligação direta com o banco via Open Finance (Pluggy): [docs/OPEN_FINANCE.md](docs/OPEN_FINANCE.md).
 
 ## Testes
 

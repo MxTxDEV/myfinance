@@ -1,4 +1,5 @@
 import type { NotificationType, PushKind, PushSlot } from "@prisma/client";
+import { pluggyConfigured, syncLink } from "./pluggy";
 import { prisma, prismaRaw, currentProfile, runAs } from "../db";
 import { readPrefs, prefsKey, type PushPrefs } from "../push-prefs";
 import { pushConfigured, sendToAll } from "../push";
@@ -172,5 +173,12 @@ export async function runTickAll(now: Date = new Date()) {
       console.error("tick falhou para um usuário", e instanceof Error ? e.name : "erro"); // sem dados financeiros nos logs
     }
   }
-  return { users: users.length, sent, alerts, failed };
+  // Bancos conectados (Open Finance): reconcilia a cada ~6 h como rede de segurança (o webhook da Pluggy sincroniza na hora).
+  let banks = 0;
+  const stale = await prismaRaw.bankLink.findMany({ where: { OR: [{ lastSyncAt: null }, { lastSyncAt: { lt: new Date(now.getTime() - 6 * 3_600_000) } }] }, select: { id: true, userId: true, user: { select: { active: true } } } });
+  for (const l of stale) {
+    if (!l.user.active || !pluggyConfigured()) continue;
+    try { await runAs(l.userId, () => syncLink(l.id, now)); banks++; } catch { failed++; }
+  }
+  return { users: users.length, sent, alerts, failed, banks };
 }

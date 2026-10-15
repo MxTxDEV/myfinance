@@ -1,25 +1,19 @@
-# Ligação automática com o banco (Open Finance) — plano
+# Ligação automática com o banco (Open Finance via Pluggy)
 
-**Situação:** ainda não implementada (o app agora é multiusuário: cada vínculo seria por usuário; já existe a entrada automática por chave pessoal — docs/AUTOMACAO.md). O app já tem todo o "cano" por onde as transações entram sozinhas:
-`previewStatement` → `commitStatement` → `createTransaction` com `importKey` único (idempotente). Hoje a fonte é um arquivo
-OFX/CSV; a ligação automática seria só **outra fonte** alimentando o mesmo cano.
+**Situação:** implementada, **ainda não validada com a API real** (o ambiente de desenvolvimento não alcança api.pluggy.ai; os testes usam respostas simuladas baseadas no SDK oficial `pluggy-sdk`). Valide primeiro em **sandbox**.
 
-## Por que não dá para fazer "direto"
-Bancos brasileiros só liberam dados a instituições autorizadas no Open Finance. Um app pessoal precisa de um **intermediário
-(agregador)** autorizado — por exemplo Pluggy ou Belvo (confira as condições atuais, inclusive planos gratuitos/pessoais).
-O usuário autoriza o consentimento no app do próprio banco (o app **nunca** vê senha bancária) e o agregador entrega as
-transações por API/webhook.
+## Como funciona
+1. Perfil → **Banco e cartão (Open Finance)** → *Conectar meu banco*: abre o widget da Pluggy (`pluggy-connect-sdk`). Você autoriza no ambiente do banco; o app **nunca vê sua senha bancária**.
+2. O servidor gera um *connect token* com `clientUserId = seu usuário`. Ao receber o `itemId`, confere na Pluggy que o item é **seu** antes de guardar (um item de outra conta é recusado).
+3. Cada conta/cartão do banco pode ir para: uma conta/cartão que você já tem, **ser criado** a partir do banco (saldo inicial calculado para o saldo do app bater com o do banco; limite e dias de fechamento/vencimento vêm do banco), ou *não importar*.
+4. **Sincronizar:** 30 dias no primeiro acesso, depois janela de 7 dias para trás. Cada lançamento entra por `createTransaction` com `importKey = pluggy:<id>` (idempotente). Regras: pendentes ignorados até virarem postados; no cartão só compras (pagamentos/estornos ficam de fora); na conta, pagamento de fatura é ignorado se houver cartão ligado (pague a fatura no app); lançamento igual (valor, ±1 dia, mesmo destino) já feito à mão/atalho **não duplica**; categoria pelo que você já usou, senão "Outras…".
+5. **Automático:** webhook `POST /api/webhooks/pluggy?s=<segredo>` (a URL é registrada no *connect token*; exige `https`) sincroniza na hora; o agendador (`/api/cron/tick`) reconcilia a cada ~6 h. O conteúdo do webhook não é confiado: só o `itemId`, e os dados são buscados de novo, autenticados.
+6. **Desconectar** apaga o item na Pluggy (revoga o acesso) e o vínculo; o que já foi importado fica.
 
-## Arquitetura proposta
-1. `src/server/connectors/<provedor>.ts`: busca contas/transações, devolve `StatementRow[]` (data, descrição, valor, `externalId`).
-2. Tabela `BankLink` (provedor, id do vínculo, conta/cartão do app, última sincronização, validade do consentimento — renovar a cada 12 meses).
-3. O agendador existente (`/api/cron/tick`) chama a sincronização; opcional webhook do provedor para sincronizar na hora.
-4. Linhas novas entram por `commitStatement` (mesmas regras de saldo/fatura/limite/orçamento/relatórios/patrimônio), com:
-   categoria aprendida, pagamento de fatura ignorado (já contado nas compras do cartão), duplicado provável (já lançado à mão) enviado para **revisão** em vez de gravar.
-5. Segredos do provedor só em variáveis de ambiente do servidor.
+## Configuração (Vercel → Environment Variables)
+`PLUGGY_CLIENT_ID`, `PLUGGY_CLIENT_SECRET` (do dashboard.pluggy.ai), `PLUGGY_SANDBOX=1` para testar com bancos de teste, `APP_URL=https://seu-app.vercel.app` (opcional). Segredos só no servidor.
 
-## O que é preciso de você para eu implementar
-- Qual provedor usar e uma conta de desenvolvedor dele (Client ID/Secret em **sandbox**).
-- Quais bancos/cartões você quer ligar.
-- Observação: este ambiente de desenvolvimento não alcança as APIs externas, então eu construiria contra a documentação do provedor
-  com testes simulados e você validaria com uma conexão real de teste antes de confiar nos números.
+## Limites conhecidos
+- O modelo de cobrança/limites do plano gratuito da Pluggy muda; confira no dashboard. A renovação do consentimento do Open Finance é periódica (o status do vínculo aparece em caso de erro).
+- Faturas: as compras entram como compras do cartão (o app monta a fatura pelas regras de fechamento do cartão criado/ligado); parcelas chegam como lançamentos individuais com "(n/N)".
+- Ainda não há reconciliação de saldo automática depois da primeira sincronização.

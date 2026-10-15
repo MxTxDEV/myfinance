@@ -3,7 +3,7 @@ import { jwtVerify } from "jose";
 
 const PUBLIC = ["/login", "/cadastro", "/manifest.webmanifest", "/icon.svg", "/sw.js", "/offline", "/pdf.worker.min.mjs"];
 // /api/cron/* se protege sozinha com CRON_SECRET (o agendador não tem cookie de sessão).
-const PUBLIC_PREFIX = ["/sounds/", "/api/cron/", "/api/ingest/"]; // ingest: autenticada por chave própria (ver ApiToken)
+const PUBLIC_PREFIX = ["/sounds/", "/api/cron/", "/api/ingest/", "/api/webhooks/"]; // ingest: autenticada por chave própria (ver ApiToken)
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

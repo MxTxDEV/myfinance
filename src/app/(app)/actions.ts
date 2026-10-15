@@ -17,6 +17,8 @@ import * as inv from "@/server/services/investments";
 import * as stmt from "@/server/services/statements";
 import * as accounts from "@/server/services/users";
 import * as tokens from "@/server/services/apitokens";
+import * as pluggy from "@/server/services/pluggy";
+import { headers } from "next/headers";
 import { pushPrefsSchema } from "@/server/push-prefs";
 import { celebrateNow, ensureSchedule, runTick } from "@/server/services/scheduler";
 import { dismissNotification } from "@/server/services/notifications";
@@ -104,3 +106,15 @@ export async function deleteMyAccount(password: string) {
   if (r.ok) await endSession();
   return r;
 }
+
+/* Open Finance (Pluggy) */
+export async function bankConnectToken() {
+  return run(async () => { const p = await assertOwner(); return pluggy.createConnectToken(p.id, (await headers()).get("origin")); }, { revalidate: false });
+}
+export async function bankRegister(itemId: string) {
+  return run(async () => { const p = await assertOwner(); const id = await pluggy.registerItem(p.id, itemId); return { id }; });
+}
+export async function bankMap(id: string, target: { accountId?: string; cardId?: string; create?: boolean }) { return run(async () => { await pluggy.mapLinkAccount(id, target); }); }
+export async function bankUnmap(id: string) { return run(async () => { await pluggy.unmapLinkAccount(id); }); }
+export async function bankSync(linkId: string) { return run(() => pluggy.syncLink(linkId)); }
+export async function bankUnlink(linkId: string) { return run(async () => { await pluggy.unlinkBank(linkId); }); }
