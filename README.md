@@ -61,6 +61,8 @@ O que chega no celular (tudo configurável em **Início → sino → Organizar n
    - Salve e clique **Test run**: deve responder `200` com `{"ok":true,…}`. Em **Notificações → Agendador** o app mostra “Ativo — última verificação há X min” (ou avisa que parou).
    O fuso (Brasília) é tratado no servidor; o `vercel.json` mantém uma chamada diária como reserva.
 
+**Não está chegando?** Abra Início → sino → **Por que não chegou?**: a tela mostra se as chaves estão no servidor, se há aparelho ativado e se o agendador está rodando, e tem o botão “Rodar o envio agora” para testar de ponta a ponta. Sem o agendador só chegam os testes manuais.
+
 Garantias: cada horário é enviado **uma única vez**, mesmo com vários agendadores; se o agendador ficar parado e um horário atrasar mais de 2 h, ele é pulado (nada chega fora de hora); cada aviso de vencimento é enviado uma vez por estágio.
 
 Limites: a notificação do sistema usa o som padrão do aparelho (o som de **caixa registradora**, `public/sounds/caixa-registradora.wav`, toca ao abrir o app, no botão 🔊 e quando a notificação chega com o app aberto); push no iPhone exige app instalado; as mensagens de push nunca levam valores em reais (tela bloqueada) — exceto os avisos de vencimento, que citam a conta e o valor.

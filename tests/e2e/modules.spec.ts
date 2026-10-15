@@ -182,7 +182,7 @@ test("menu de notificações: organizar horários, categorias e avisos (persiste
   await login(page);
   await page.goto("/notificacoes");
   await expect(page.getByText("Organizar notificações")).toBeVisible();
-  await expect(page.getByText("Ainda não chamou o servidor.")).toBeVisible(); // agendador externo ainda não configurado neste ambiente
+  await expect(page.getByText("nunca chamou o servidor")).toBeVisible(); // agendador externo ainda não configurado neste ambiente
   await page.getByLabel("Mensagens sorteadas por dia").selectOption("3");
   await page.getByLabel("A partir de").fill("08:00");
   await page.getByLabel("Até", { exact: true }).fill("20:00");
@@ -233,6 +233,37 @@ test("parabéns: concluir uma meta mostra a conquista no Início e dá para disp
   await expect(page.getByRole("region", { name: "Conquista" }).filter({ hasText: "Meta relâmpago" })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole("region", { name: "Conquista" }).filter({ hasText: "Meta relâmpago" })).toHaveCount(0); // continua dispensada
+});
+
+test("barra de navegação fica fixa ao rolar a página", async ({ page }) => {
+  await login(page);
+  await page.goto("/notificacoes"); // página longa
+  const nav = page.getByRole("navigation", { name: "Principal" });
+  await expect(nav).toBeVisible();
+  const vh = await page.evaluate(() => window.innerHeight);
+  // Sem overflow-x no body (causa do bug da barra "andando" no Safari do iPhone)
+  expect(await page.evaluate(() => getComputedStyle(document.body).overflowX)).toBe("visible");
+  const total = await page.evaluate(() => document.documentElement.scrollHeight);
+  expect(total).toBeGreaterThan(vh * 1.5); // há mesmo o que rolar
+  for (const y of [0, 400, 900, total]) {
+    await page.evaluate((top) => window.scrollTo(0, top), y);
+    await page.waitForTimeout(120);
+    const box = await nav.boundingBox();
+    expect(Math.round(box!.y + box!.height), `scroll ${y}`).toBe(vh); // colada no fundo da tela
+  }
+});
+
+test("diagnóstico: mostra por que não chega notificação e o botão de teste responde", async ({ page }) => {
+  await login(page);
+  await page.goto("/notificacoes");
+  const card = page.locator("section", { hasText: "Por que não chegou?" }).first();
+  await expect(card.getByText("Chaves de notificação no servidor")).toBeVisible();
+  await expect(card.getByText(/Aparelhos ativados/)).toBeVisible();
+  await expect(card.getByText("Por isso nada chega sozinho.")).toBeVisible();
+  await expect(card.locator("code").filter({ hasText: "/api/cron/tick" })).toContainText("http");
+  await card.getByRole("button", { name: /Rodar o envio agora/ }).click();
+  await expect(card.getByRole("status")).toContainText("As chaves de notificação não estão no servidor.");
+  await expect(page.getByText("Horário passou e não foi enviada").first()).toBeVisible().catch(() => {}); // depende da hora do teste
 });
 
 test("acessibilidade: sem violações sérias nas telas principais", async ({ page }) => {

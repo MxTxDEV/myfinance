@@ -176,6 +176,13 @@ describe("agendador (tick)", () => {
     expect(sent).toHaveLength(n);
     expect((await prisma.heartbeat.findUniqueOrThrow({ where: { key: "tick" } })).at.getTime()).toBe(now.getTime() + 60_000);
   });
+  it("execução manual não finge ser o agendador (não grava batimento)", async () => {
+    await prisma.profile.create({ data: { email: "a@b.c", name: "A", passwordHash: "x" } });
+    await runTick(T("2026-10-16", "06:03"), { manual: true });
+    expect(await prisma.heartbeat.count()).toBe(0);
+    await runTick(T("2026-10-16", "06:04"));
+    expect(await prisma.heartbeat.count()).toBe(1);
+  });
   it("pausado ou sem chaves: não envia, mas continua gerando horários e avisos", async () => {
     await prisma.profile.create({ data: { email: "a@b.c", name: "A", passwordHash: "x", notifyPrefs: { menu: { enabled: false } } } });
     const r = await runTick(T("2026-10-16", "06:03"));

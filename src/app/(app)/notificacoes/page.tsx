@@ -9,6 +9,8 @@ import { Card, Empty } from "@/components/ui";
 import { NotifyMenu } from "@/components/notify-menu";
 import { PushSettings } from "@/components/daily-message";
 import { MarkRead } from "./mark-read";
+import { SchedulerStatus } from "@/components/scheduler-status";
+import { pushConfigured } from "@/server/push";
 
 const KIND = { MORNING: "🌅 Manhã", SPEND: "🛑 Pensar antes de gastar", INVEST: "📈 Investir", MOTIVATION: "💪 Incentivo" } as const;
 
@@ -17,7 +19,7 @@ export default async function Notificacoes() {
   const now = new Date();
   const prefs = readPrefs(owner.notifyPrefs);
   await generateNotifications();
-  const [items, slots, beat] = await Promise.all([listNotifications(), ensureSchedule(now, prefs), prisma.heartbeat.findUnique({ where: { key: "tick" } })]);
+  const [items, slots, beat, devices] = await Promise.all([listNotifications(), ensureSchedule(now, prefs), prisma.heartbeat.findUnique({ where: { key: "tick" } }), prisma.pushSubscription.count()]);
   const ageMin = beat ? Math.round((now.getTime() - beat.at.getTime()) / 60_000) : null;
   const schedulerOk = ageMin !== null && ageMin <= 30;
   const fmt = (t: string) => (prefs.emojis ? t : t.replace(/\p{Extended_Pictographic}️?/gu, "").trim());
@@ -36,6 +38,7 @@ export default async function Notificacoes() {
                 <div className="min-w-0">
                   <p className="font-semibold">{KIND[s.kind]}</p>
                   {(s.sentAt || s.skipped) && <p className="text-muted">{s.skipped ? "Não enviada (fora de hora)" : styleMessage(s.message, prefs.emojis)}</p>}
+                  {!s.sentAt && !s.skipped && s.at < now && <p className="font-medium text-expense">Horário passou e não foi enviada — o agendador não está rodando.</p>}
                 </div>
                 <span className={`shrink-0 font-bold tabular-nums ${s.sentAt ? "text-income" : "text-text"}`}>{formatHHMM(localParts(s.at).minutes)}{s.sentAt ? " ✓" : ""}</span>
               </li>
@@ -47,11 +50,9 @@ export default async function Notificacoes() {
 
       <Card title="Organizar notificações"><NotifyMenu initial={prefs} /></Card>
 
-      <Card title="Agendador">
-        <p role="status" className={`text-sm font-medium ${schedulerOk ? "text-income" : "text-expense"}`}>
-          {schedulerOk ? `Ativo — última verificação há ${ageMin} min.` : beat ? `Parado — última verificação há ${ageMin! >= 120 ? `${Math.round(ageMin! / 60)} h` : `${ageMin} min`}.` : "Ainda não chamou o servidor."}
-        </p>
-        {!schedulerOk && <p className="mt-1 text-sm text-muted">Para as mensagens chegarem em horários aleatórios, um agendador gratuito (cron-job.org) precisa chamar o servidor a cada 5 minutos. Veja o passo a passo no README, seção “Mensagens e avisos”.</p>}
+      <Card title="Por que não chegou?">
+        <SchedulerStatus keysOk={pushConfigured()} devices={devices} schedulerOk={schedulerOk}
+          ageLabel={ageMin === null ? null : ageMin >= 120 ? `última verificação há ${Math.round(ageMin / 60)} h` : `última verificação há ${ageMin} min`} />
       </Card>
 
       {items.length === 0 ? <Card><Empty title="Tudo em dia" hint="Avisos de vencimentos, orçamentos e metas aparecem aqui." /></Card> : (

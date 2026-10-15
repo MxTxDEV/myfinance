@@ -126,8 +126,9 @@ export async function sendAlertPushes(now: Date, prefs: PushPrefs, opts: { only?
  * Chamado pelo agendador a cada poucos minutos (e 1x/dia pelo Vercel Cron).
  * Gera o que for devido (recorrências e avisos), sorteia os horários do dia e envia o que já chegou.
  */
-export async function runTick(now: Date = new Date()) {
-  await prisma.heartbeat.upsert({ where: { key: "tick" }, update: { at: now }, create: { key: "tick", at: now } });
+export async function runTick(now: Date = new Date(), opts: { manual?: boolean } = {}) {
+  // Execução manual (botão "Rodar agora") não conta como batimento: o status do agendador externo continua honesto.
+  if (!opts.manual) await prisma.heartbeat.upsert({ where: { key: "tick" }, update: { at: now }, create: { key: "tick", at: now } });
   const profile = await prisma.profile.findFirst();
   const prefs = readPrefs(profile?.notifyPrefs);
   const { day } = localParts(now);

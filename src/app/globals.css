@@ -38,7 +38,11 @@
 }
 
 html, body { background: var(--bg); color: var(--text); }
-body { font-family: var(--font-sans); -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
+/* Sem overflow-x no body: no Safari do iPhone isso faz a barra inferior (position: fixed) andar junto com a rolagem. */
+body { font-family: var(--font-sans); -webkit-tap-highlight-color: transparent; }
+html { -webkit-text-size-adjust: 100%; }
+/* Barra de navegação: fica numa camada própria da GPU, ancorada ao fundo da tela. */
+.bottom-nav { transform: translate3d(0, 0, 0); -webkit-transform: translate3d(0, 0, 0); will-change: transform; }
 .num { font-variant-numeric: tabular-nums; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: no-preference) {

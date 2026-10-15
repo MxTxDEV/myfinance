@@ -15,7 +15,7 @@ import * as plan from "@/server/services/planning";
 import * as notif from "@/server/services/notifications";
 import * as inv from "@/server/services/investments";
 import { pushPrefsSchema } from "@/server/push-prefs";
-import { celebrateNow, ensureSchedule } from "@/server/services/scheduler";
+import { celebrateNow, ensureSchedule, runTick } from "@/server/services/scheduler";
 import { dismissNotification } from "@/server/services/notifications";
 import { todayBR } from "@/domain/dates";
 
@@ -87,3 +87,4 @@ export async function investValue(v: Parameters<typeof inv.updateInvestmentValue
 export async function removeInvestment(id: string) { return run(async () => { await inv.archiveInvestment(id); }); }
 export async function editRecurring(id: string, v: Parameters<typeof rec.updateRecurring>[1]) { return run(async () => { await rec.updateRecurring(id, v); }); }
 export async function stopRecurring(id: string) { return run(() => rec.endRecurring(id)); }
+export async function runTickNow() { return run(() => runTick(new Date(), { manual: true })); }

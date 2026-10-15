@@ -30,7 +30,7 @@ export function BottomNav() {
     );
   };
   return (
-    <nav aria-label="Principal" className="fixed inset-x-0 bottom-0 z-40 flex items-center border-t border-border bg-surface px-2 pb-[env(safe-area-inset-bottom)] pt-1.5 md:hidden">
+    <nav aria-label="Principal" className="bottom-nav fixed inset-x-0 bottom-0 z-40 flex items-center border-t border-border bg-surface px-2 pb-[env(safe-area-inset-bottom)] pt-1.5 md:hidden">
       {left.map(item)}
       <button onClick={() => add()} aria-label="Adicionar movimentação" className="mx-1 -mt-5 grid size-14 shrink-0 place-items-center rounded-full bg-accent text-on-accent shadow-md">
         <Plus className="size-7" />
