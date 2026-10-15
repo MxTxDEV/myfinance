@@ -1,10 +1,11 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, X } from "lucide-react";
+import { Check, ChevronDown, CloudOff, X } from "lucide-react";
 import { MoneyInput } from "./money-input";
 import { CategoryIcon } from "./icons";
 import { getSuggestions, saveTransaction } from "@/app/(app)/actions";
+import { enqueue } from "@/lib/outbox";
 
 export interface QuickAddData {
   today: string;
@@ -47,6 +48,9 @@ function Sheet({ data, initial, onClose }: { data: QuickAddData; initial: Kind; 
   const [due, setDue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [queued, setQueued] = useState(false); // salvo só no aparelho, aguardando internet
+  const [clientId, setClientId] = useState(() => crypto.randomUUID());
+  const [repeat, setRepeat] = useState<"" | "MONTHLY" | "WEEKLY" | "BIWEEKLY" | "YEARLY">("");
   const [sugs, setSugs] = useState<{ description: string; categoryId: string | null }[]>([]);
   const [pending, start] = useTransition();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -59,7 +63,7 @@ function Sheet({ data, initial, onClose }: { data: QuickAddData; initial: Kind; 
   useEffect(() => { // defaults ao trocar o tipo (deps primitivas: refresh do servidor não reseta o formulário)
     setCategoryId(""); setTouchedCat(false); setPlanned(false); setInstallments(1);
     setTarget(firstAccount ? `acc:${firstAccount}` : "");
-    getSuggestions(kind).then((r) => r.ok && setSugs(r.data ?? []));
+    getSuggestions(kind).then((r) => r.ok && setSugs(r.data ?? [])).catch(() => {}); // offline: sem sugestões
   }, [kind, firstAccount]);
 
   useEffect(() => {
@@ -81,20 +85,30 @@ function Sheet({ data, initial, onClose }: { data: QuickAddData; initial: Kind; 
     if (!categoryId) return setError("Escolha uma categoria");
     if (!target) return setError("Cadastre uma conta em Perfil para começar");
     const [tkind, tid] = target.split(":");
+    const payload = {
+      type: kind, amount, description: description.trim() || cats.find((c) => c.id === categoryId)!.name, date, categoryId,
+      status: planned && tkind === "acc" ? ("PLANNED" as const) : ("SETTLED" as const),
+      ...(tkind === "card" ? { cardId: tid, installments } : { accountId: tid, installments: 1 }),
+      payerSource: payer || undefined, notes: notes || undefined, dueDate: due || undefined,
+      repeat: repeat && !(tkind === "card" && installments > 1) ? repeat : undefined,
+    };
+    // Sem internet: guarda no aparelho (fila) e avisa com clareza que NÃO foi salvo no servidor ainda.
+    const queue = async () => { await enqueue({ clientId, payload }); setQueued(true); setSaved(true); };
     start(async () => {
-      const r = await saveTransaction({
-        type: kind, amount, description: description.trim() || cats.find((c) => c.id === categoryId)!.name, date, categoryId,
-        status: planned && tkind === "acc" ? "PLANNED" : "SETTLED",
-        ...(tkind === "card" ? { cardId: tid, installments } : { accountId: tid, installments: 1 }),
-        payerSource: payer || undefined, notes: notes || undefined, dueDate: due || undefined,
-      });
-      if (!r.ok) return setError(r.error);
-      setSaved(true);
-      router.refresh();
+      if (!navigator.onLine) return queue();
+      try {
+        const r = await saveTransaction({ ...payload, clientId });
+        if (!r.ok) return setError(r.error);
+        setSaved(true);
+        router.refresh();
+      } catch {
+        await queue(); // falha de rede no meio do envio: o clientId impede duplicar quando reenviar
+      }
     });
   }
 
   function again() {
+    setClientId(crypto.randomUUID()); setQueued(false); setRepeat("");
     setSaved(false); setAmount(0); setDescription(""); setCategoryId(""); setTouchedCat(false); setNotes(""); setPayer(""); setDue(""); setInstallments(1);
   }
 
@@ -109,8 +123,9 @@ function Sheet({ data, initial, onClose }: { data: QuickAddData; initial: Kind; 
       >
         {saved ? (
           <div role="status" className="flex flex-col items-center gap-4 py-8 text-center pop">
-            <span className={`grid size-16 place-items-center rounded-full ${kind === "INCOME" ? "bg-income-bg text-income" : "bg-expense-bg text-expense"}`}><Check className="size-8" /></span>
-            <p className="text-lg font-bold">{kind === "INCOME" ? "Receita registrada" : "Despesa registrada"}</p>
+            <span className={`grid size-16 place-items-center rounded-full ${queued ? "bg-surface-2 text-muted" : kind === "INCOME" ? "bg-income-bg text-income" : "bg-expense-bg text-expense"}`}>{queued ? <CloudOff className="size-8" /> : <Check className="size-8" />}</span>
+            <p className="text-lg font-bold">{queued ? "Salvo no aparelho — pendente" : kind === "INCOME" ? "Receita registrada" : "Despesa registrada"}</p>
+            {queued && <p className="max-w-xs text-sm text-muted">Você está sem conexão. Este lançamento será enviado automaticamente quando a internet voltar e só então entra no saldo.</p>}
             <div className="flex w-full gap-3">
               <button onClick={again} className="flex-1 rounded-md bg-surface-2 py-3.5 font-semibold">Registrar outra</button>
               <button onClick={onClose} className="flex-1 rounded-md bg-accent py-3.5 font-semibold text-on-accent">Concluir</button>
@@ -176,6 +191,14 @@ function Sheet({ data, initial, onClose }: { data: QuickAddData; initial: Kind; 
                   <label className="text-sm text-muted">Parcelas
                     <select value={installments} onChange={(e) => setInstallments(Number(e.target.value))} className={`${field} mt-1`}>
                       {[1, 2, 3, 4, 5, 6, 8, 10, 12, 18, 24].map((n) => <option key={n} value={n}>{n === 1 ? "À vista" : `${n}x`}</option>)}
+                    </select>
+                  </label>
+                )}
+                {!(isCard && installments > 1) && (
+                  <label className="text-sm text-muted">Repetir
+                    <select value={repeat} onChange={(e) => setRepeat(e.target.value as typeof repeat)} className={`${field} mt-1`}>
+                      <option value="">Não repete</option><option value="MONTHLY">Todo mês</option><option value="WEEKLY">Toda semana</option>
+                      <option value="BIWEEKLY">A cada 15 dias</option><option value="YEARLY">Todo ano</option>
                     </select>
                   </label>
                 )}

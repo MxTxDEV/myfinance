@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 
 export default function setup() {
   const env = {
@@ -6,6 +6,8 @@ export default function setup() {
     OWNER_EMAIL: "dono@example.com", OWNER_NAME: "Dono Teste", OWNER_PASSWORD: "senha-e2e-segura-1",
   };
   execSync("npx prisma migrate deploy", { env, stdio: "ignore" });
-  execSync(`psql "${env.DATABASE_URL}" -c "TRUNCATE \\"Transaction\\",\\"Transfer\\",\\"Invoice\\",\\"InstallmentPlan\\",\\"CreditCard\\",\\"Account\\",\\"Category\\",\\"Profile\\" RESTART IDENTITY CASCADE"`, { stdio: "ignore" });
+  // Zera TODAS as tabelas (exceto o histórico de migrações), para o teste começar sempre do zero.
+  const truncateAll = `DO $$ DECLARE r record; BEGIN FOR r IN SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename <> '_prisma_migrations' LOOP EXECUTE 'TRUNCATE TABLE "' || r.tablename || '" RESTART IDENTITY CASCADE'; END LOOP; END $$;`;
+  execFileSync("psql", [env.DATABASE_URL, "-c", truncateAll], { stdio: "ignore" }); // sem shell: "$$" não é expandido
   execSync("npx tsx scripts/seed-owner.ts", { env, stdio: "ignore" });
 }

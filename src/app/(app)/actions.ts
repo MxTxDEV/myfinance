@@ -13,6 +13,7 @@ import * as rec from "@/server/services/recurring";
 import { suggestions } from "@/server/services/ledger";
 import * as plan from "@/server/services/planning";
 import * as notif from "@/server/services/notifications";
+import * as inv from "@/server/services/investments";
 import { todayBR } from "@/domain/dates";
 
 export type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
@@ -68,3 +69,11 @@ export async function saveNotifyPrefs(disabled: string[], leadDays: number) {
   return run(async () => { const p = await assertOwner(); await prisma.profile.update({ where: { id: p.id }, data: { notifyPrefs: { disabled, leadDays } } }); });
 }
 export async function editTransfer(id: string, v: Parameters<typeof tr.updateTransfer>[1]) { return run(async () => { await tr.updateTransfer(id, v); }); }
+
+export async function saveInvestment(v: Parameters<typeof inv.createInvestment>[0]) { return run(async () => { await inv.createInvestment(v); }); }
+export async function investContribute(v: Parameters<typeof inv.contribute>[0]) { return run(async () => { await inv.contribute(v); }); }
+export async function investWithdraw(v: Parameters<typeof inv.withdraw>[0]) { return run(async () => { await inv.withdraw(v); }); }
+export async function investValue(v: Parameters<typeof inv.updateInvestmentValue>[0]) { return run(async () => { await inv.updateInvestmentValue(v); }); }
+export async function removeInvestment(id: string) { return run(async () => { await inv.archiveInvestment(id); }); }
+export async function editRecurring(id: string, v: Parameters<typeof rec.updateRecurring>[1]) { return run(async () => { await rec.updateRecurring(id, v); }); }
+export async function stopRecurring(id: string) { return run(() => rec.endRecurring(id)); }

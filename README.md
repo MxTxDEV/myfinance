@@ -34,6 +34,24 @@ Os testes de integração/E2E usam o banco `finance_os_test` (crie com `createdb
 3. Rode `npm run db:migrate` e `npm run db:seed-owner` uma vez apontando para o banco de produção.
 4. HTTPS é automático na Vercel; o app envia HSTS, CSP, `X-Frame-Options: DENY` e demais headers (`next.config.ts`).
 
+## Offline
+
+O app é instalável (PWA) e funciona sem internet:
+- As telas principais são salvas no aparelho (ficam em cache do navegador). Sem conexão você **vê os últimos dados** e uma faixa avisa que está offline.
+- **RECEBI/GASTEI offline:** o lançamento vai para uma fila no aparelho (IndexedDB), marcada como **pendente** — *não* conta no saldo até chegar ao servidor. Ao voltar a internet é enviado sozinho; cada lançamento tem um identificador único, então reenvios **nunca duplicam**. Se o servidor recusar (ex.: categoria arquivada), o app mostra o erro e deixa você descartar.
+- Outras ações (editar, excluir, cartões, planejamento…) exigem internet.
+- Ao **Sair**, as telas salvas no aparelho são apagadas.
+- O offline só existe no app publicado (build de produção); no `npm run dev` o service worker fica desligado.
+
+## Mensagem das 06:00 (push)
+
+Todo dia às 06:00 (Brasília) o servidor envia uma mensagem do banco em `src/domain/messages.ts` (100 mensagens; edite/acrescente à vontade — nenhuma repete antes de todas saírem).
+
+1. Gere as chaves: `npm run vapid` e coloque na Vercel: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (ex.: `mailto:voce@email.com`) e `CRON_SECRET`.
+2. O agendamento diário está em `vercel.json` (`0 9 * * *` UTC = 06:00 de Brasília). **No plano Hobby da Vercel o horário do cron não é exato: roda em algum momento da hora marcada (entre 06:00 e 06:59).** Para pontualidade exata, use um agendador gratuito como o cron-job.org chamando `GET https://SEU-APP.vercel.app/api/cron/daily` às 06:00 (fuso America/Sao_Paulo) com o cabeçalho `Authorization: Bearer <CRON_SECRET>`; o envio é protegido para sair **uma única vez por dia**, mesmo com os dois agendadores ligados.
+3. No app: **Início → sino (Notificações) → Mensagem das 06:00 → Ativar neste aparelho**. No iPhone, só funciona com o app instalado na Tela de Início (iOS 16.4+).
+4. A notificação do sistema usa o som padrão do aparelho (navegadores não permitem som personalizado em push). O som de **caixa registradora** (`public/sounds/caixa-registradora.wav`) toca ao abrir a mensagem no app, no botão 🔊 e quando a notificação chega com o app aberto. Para usar o som também fora do app, no Android escolha-o nas configurações de notificação do site/app instalado.
+
 ## Backup e recuperação
 
 ```bash

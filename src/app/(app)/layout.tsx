@@ -5,6 +5,8 @@ import { PrivacyProvider } from "@/components/privacy";
 import { QuickAddProvider } from "@/components/quick-add";
 import { BottomNav, Sidebar } from "@/components/nav";
 import { SwRegister } from "@/components/sw-register";
+import { OfflineStatus } from "@/components/offline";
+import { PushSoundListener } from "@/components/daily-message";
 import { ThemeApplier } from "@/components/theme";
 
 export const dynamic = "force-dynamic";
@@ -29,10 +31,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       >
         <Sidebar name={owner.name} />
         <main className="mx-auto w-full max-w-3xl px-4 pb-28 pt-[max(1rem,env(safe-area-inset-top))] md:max-w-none md:pb-10 md:pl-[17rem] md:pr-8 md:pt-8">
-          <div className="mx-auto max-w-4xl">{children}</div>
+          <div className="mx-auto max-w-4xl"><OfflineStatus />{children}</div>
         </main>
         <BottomNav />
         <SwRegister />
+        <PushSoundListener />
       </QuickAddProvider>
     </PrivacyProvider>
   );

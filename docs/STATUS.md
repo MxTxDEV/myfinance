@@ -8,6 +8,10 @@
 | 4 Planejamento | ✅ Orçamentos, metas, dívidas (+simulação), patrimônio, relatórios, projeção, notificações, CSV/JSON, resumo imprimível |
 | 5 Qualidade | ✅ Testes, headers/CSP, a11y (axe), PWA, backup/restore testado · ⏳ ver pendências |
 
+## Atualização — offline, investimentos, contas fixas e mensagens
+✅ App offline com fila e sincronização idempotente · ✅ Investimentos (aporte/resgate/valor/rentabilidade/distribuição) · ✅ Contas fixas (painel do mês, editar, encerrar, repetir) · ✅ 100 mensagens + push diário 06:00 + som de caixa registradora.
+Limitações: horário exato do cron exige agendador externo no plano Hobby; som personalizado só dentro do app; push no iPhone exige app instalado; offline não permite editar/excluir.
+
 ## Testes
 - Unitários: dinheiro/arredondamento, datas, ciclo de cartão, recorrência, orçamento, metas, patrimônio, dívidas.
 - Integração (Postgres real): criação/edição/exclusão/duplicação, saldos, previstas, transferências, cartão (limite, faturas, parcelas, pagamento total/parcial), recorrências (incluindo chamadas concorrentes), orçamento, metas, dívidas, patrimônio, relatórios, notificações, desempenho com 10.000 registros.

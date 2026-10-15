@@ -3,6 +3,7 @@ import { generateNotifications, listNotifications } from "@/server/services/noti
 import { Card, Empty } from "@/components/ui";
 import { NotifyPrefsForm } from "../planejamento/forms";
 import { MarkRead } from "./mark-read";
+import { PushSettings } from "@/components/daily-message";
 
 export default async function Notificacoes() {
   const owner = await requireOwner();
@@ -22,6 +23,7 @@ export default async function Notificacoes() {
           ))}
         </ul>
       )}
+      <Card title="Mensagem das 06:00"><PushSettings publicKey={process.env.VAPID_PUBLIC_KEY ?? null} /></Card>
       <details className="rounded-md border border-border bg-surface"><summary className="flex cursor-pointer items-center justify-between p-4 font-bold">Preferências</summary>
         <div className="p-4 pt-0"><NotifyPrefsForm disabled={prefs.disabled ?? []} leadDays={prefs.leadDays ?? 3} /></div></details>
     </div>

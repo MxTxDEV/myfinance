@@ -28,7 +28,7 @@ export function Filters({ categories, accounts }: { categories: { id: string; na
       </label>
       <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filtros">
         <select aria-label="Tipo" value={opt("type")} onChange={(e) => set("type", e.target.value)} className={sel}>
-          <option value="">Tipo</option><option value="INCOME">Receitas</option><option value="EXPENSE">Despesas</option><option value="TRANSFER">Transferências</option>
+          <option value="">Tipo</option><option value="INCOME">Receitas</option><option value="EXPENSE">Despesas</option><option value="TRANSFER">Transferências</option><option value="INVESTMENT">Investimentos</option>
         </select>
         <select aria-label="Situação" value={opt("status")} onChange={(e) => set("status", e.target.value)} className={sel}>
           <option value="">Situação</option><option value="SETTLED">Pago/recebido</option><option value="PLANNED">Previsto</option>

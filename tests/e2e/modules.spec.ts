@@ -112,11 +112,78 @@ test("transferência e edição/duplicação/exclusão pela interface", async ({
   await expect(page.getByRole("button", { name: /^Mercado/ })).toHaveCount(1);
 });
 
+test("investimentos: cadastrar, aportar, atualizar valor e ver rendimento", async ({ page }) => {
+  await login(page);
+  await page.goto("/planejamento?tab=investimentos");
+  await expect(page.getByText("Nenhum investimento cadastrado")).toBeVisible();
+  await page.getByText("Novo investimento").click();
+  await page.getByLabel("Nome do investimento").fill("CDB Teste");
+  await page.getByLabel("Valor atual").fill("100000");
+  await page.getByRole("button", { name: "Cadastrar investimento" }).click();
+  await expect(page.getByText("CDB Teste")).toBeVisible();
+  await page.getByText("Aporte ou resgate").click();
+  await page.locator("details[open]").getByLabel("Valor", { exact: true }).fill("20000");
+  await page.locator("details[open]").getByLabel("Conta").selectOption({ index: 1 });
+  await page.getByRole("button", { name: "Registrar aporte" }).click();
+  await expect(page.getByText("R$ 1.200,00").first()).toBeVisible();
+  await page.getByText("Atualizar valor de hoje").click();
+  await page.locator("details[open]").getByLabel("Valor de hoje").fill("132000");
+  await page.getByRole("button", { name: "Atualizar valor" }).click();
+  await expect(page.getByText("+ R$ 120,00").first()).toBeVisible(); // 1.320 − (1.000 + 200) = +120
+  // o aporte aparece no extrato como movimento neutro, não como despesa
+  await page.goto("/movimentacoes?type=INVESTMENT");
+  await expect(page.getByRole("button", { name: /^Aporte: CDB Teste/ })).toBeVisible();
+});
+
+test("contas fixas: repetir pelo lançamento rápido, painel do mês, editar e encerrar", async ({ page }) => {
+  await login(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "GASTEI" }).click();
+  await page.getByLabel("Valor", { exact: true }).fill("10400");
+  await page.getByLabel("Descrição").fill("Internet fixa");
+  await page.getByLabel("Categoria", { exact: true }).selectOption({ label: "Moradia" });
+  await page.getByRole("button", { name: /Mais detalhes/ }).click();
+  await page.getByLabel("Repetir").selectOption("MONTHLY");
+  await page.getByRole("button", { name: "Salvar gasto" }).click();
+  await expect(page.getByText("Despesa registrada")).toBeVisible();
+  await page.getByRole("button", { name: "Concluir" }).click();
+
+  await page.goto("/planejamento?tab=compromissos");
+  await expect(page.getByText("Despesas fixas", { exact: true })).toBeVisible();
+  await expect(page.getByText("Internet fixa").first()).toBeVisible();
+  await expect(page.getByText(/Pago \d\d\/\d\d\/\d{4}/).first()).toBeVisible();
+  await page.getByText("Editar valor e dados").first().click();
+  await page.locator("details[open]").getByLabel("Valor", { exact: true }).fill("11900");
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await expect(page.getByText("Salvo ✓").first()).toBeVisible();
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Encerrar" }).first().click();
+  await expect(page.getByText("encerrada").first()).toBeVisible();
+});
+
+test("mensagem do dia e som de caixa registradora", async ({ page, request }) => {
+  await login(page);
+  const card = page.getByRole("region", { name: "Mensagem do dia" });
+  await expect(card).toBeVisible();
+  await expect(card.getByText("Antes de gastar hoje")).toBeVisible();
+  expect((await card.locator("p").nth(1).innerText()).length).toBeGreaterThan(30);
+  await expect(card.getByRole("button", { name: "Ouvir a caixa registradora" })).toBeVisible();
+  const snd = await page.request.get("/sounds/caixa-registradora.wav");
+  expect(snd.status()).toBe(200);
+  expect(snd.headers()["content-type"]).toContain("audio");
+  // sem segredo, o cron está fechado
+  expect((await request.get("/api/cron/daily")).status()).toBe(401);
+  await page.goto("/notificacoes");
+  await expect(page.getByText("Mensagem das 06:00").first()).toBeVisible();
+  await expect(page.getByLabel(/Tocar a caixa registradora/)).toBeChecked();
+});
+
 test("acessibilidade: sem violações sérias nas telas principais", async ({ page }) => {
   await login(page);
-  for (const url of ["/", "/movimentacoes", "/perfil", "/planejamento?tab=metas", "/notificacoes"]) {
+  for (const url of ["/", "/movimentacoes", "/perfil", "/planejamento?tab=metas", "/planejamento?tab=investimentos", "/planejamento?tab=compromissos", "/notificacoes"]) {
     await page.goto(url);
-    await page.waitForLoadState("networkidle");
+    await page.locator("main").waitFor();
+    await page.waitForTimeout(800); // deixa as animações assentarem (a rede nunca fica ociosa: há sincronização em segundo plano)
     const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
     const bad = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     for (const v of bad) for (const n of v.nodes) console.log("A11Y", url, n.html.slice(0, 80), "|", (n.any[0]?.message ?? "").slice(0, 140));

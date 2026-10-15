@@ -41,6 +41,23 @@
 ## Notificações
 - Geradas ao abrir Início/Notificações, idempotentes por `dedupeKey` (uma por evento), tipos desligáveis e antecedência configurável. Sem push externo na v1.
 
+## Investimentos
+- Módulo próprio (`Investment` + histórico `InvestmentEntry`), manual, sem cotações. Valor atual é informado por você.
+- **Aporte** com conta = saída da conta (`INVESTMENT_OUT`) e o valor do investimento sobe; **resgate** com conta = entrada (`INVESTMENT_IN`). Nenhum dos dois é despesa/receita nos relatórios. Sem conta, só registra a posição (dinheiro que já estava fora do app; usado também na posição inicial).
+- Rendimento total = valor atual + resgatado − aportado; rentabilidade = rendimento ÷ aportado. Resgate não passa do valor atual.
+- Patrimônio: investimentos entram **uma vez** (o aporte já reduziu a conta). Excluir um aporte/resgate pelo extrato desfaz tudo (conta, histórico e valor).
+
+## Contas fixas
+- Compromisso recorrente + painel do mês: previsto, pago, falta pagar, atrasado, custo mensal médio (semanal/quinzenal/anual convertidos para mês) e peso na renda.
+- Editar valor/dados vale para as próximas ocorrências **não pagas** (inclusive vencidas em aberto); as pagas não mudam. Encerrar remove as futuras não pagas, mantém vencidas em aberto e o histórico.
+- "Repetir" no lançamento rápido cria o compromisso e já marca o lançamento como a 1ª ocorrência (não duplica).
+
+## Offline
+- Cache de páginas (rede primeiro) + fila de lançamentos RECEBI/GASTEI com `clientId` único (índice único no banco): reenvio idempotente, inclusive concorrente. Pendentes **não** entram no saldo e são mostrados como pendentes. Sem edição/exclusão offline (evita conflitos).
+
+## Mensagem diária
+- O "dia" das mensagens começa às 06:00 de Brasília. Mesma data → mesma mensagem em qualquer aparelho; ordem embaralhada por ciclo. Envio protegido por `PushDelivery` (uma vez por dia). A notificação push não contém valores (tela bloqueada); os números do mês só aparecem dentro do app e respeitam "ocultar valores".
+
 ## Segurança
 - Senha com scrypt (N=2¹⁵) + salt; sessão JWT HS256 em cookie `httpOnly`/`sameSite=lax`/`secure` (prod), 14 dias, validada no middleware (assinatura) e no servidor (versão no banco). Limite de tentativas de login em memória (instância única — aceitável para uso pessoal; em serverless considere um limitador externo).
 - Logs de erro não incluem dados financeiros. CSV neutraliza injeção de fórmulas.

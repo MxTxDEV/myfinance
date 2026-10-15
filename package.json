@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "DATABASE_URL=${DATABASE_URL_UNPOOLED:-$DATABASE_URL} prisma migrate deploy",
     "db:seed-owner": "tsx scripts/seed-owner.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "vapid": "node -e \"const k=require('web-push').generateVAPIDKeys();console.log('VAPID_PUBLIC_KEY='+k.publicKey);console.log('VAPID_PRIVATE_KEY='+k.privateKey);console.log('CRON_SECRET='+require('crypto').randomBytes(24).toString('base64url'))\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

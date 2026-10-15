@@ -159,3 +159,72 @@ export function NotifyPrefsForm({ disabled, leadDays }: { disabled: string[]; le
     </form>
   );
 }
+
+const INV_TYPES: [string, string][] = [["FIXED_INCOME", "Renda fixa (CDB, LCI…)"], ["TREASURY", "Tesouro Direto"], ["STOCKS", "Ações"], ["REAL_ESTATE_FUND", "Fundos imobiliários"], ["FUNDS", "Fundos"], ["CRYPTO", "Cripto"], ["PENSION", "Previdência"], ["OTHER", "Outro"]];
+export const INV_LABEL = Object.fromEntries(INV_TYPES);
+
+export function InvestmentForm({ today }: { today: string }) {
+  const { error, done, pending, run } = useAction();
+  const [name, setName] = useState(""); const [type, setType] = useState("FIXED_INCOME"); const [inst, setInst] = useState(""); const [value, setValue] = useState(0);
+  return (
+    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault();
+      run(() => A.saveInvestment({ name, type: type as "FIXED_INCOME", institution: inst || undefined, initialValue: value, date: today }), () => { setName(""); setValue(0); }); }}>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome (ex.: CDB Banco X 110% CDI)" aria-label="Nome do investimento" required className={field} />
+      <select value={type} onChange={(e) => setType(e.target.value)} aria-label="Tipo de investimento" className={field}>{INV_TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+      <input value={inst} onChange={(e) => setInst(e.target.value)} placeholder="Instituição (opcional)" aria-label="Instituição" className={field} />
+      <p className="-mb-1 text-sm text-muted">Quanto você já tem nele hoje (deixe zero se vai começar agora)</p>
+      <MoneyInput cents={value} onChange={setValue} label="Valor atual" className="!text-xl" />
+      <Msg error={error} done={done} /><Submit pending={pending}>Cadastrar investimento</Submit>
+    </form>
+  );
+}
+
+export function InvestMoveForm({ investmentId, accounts, today, value }: { investmentId: string; accounts: Opt[]; today: string; value: number }) {
+  const { error, done, pending, run } = useAction();
+  const [amount, setAmount] = useState(0); const [kind, setKind] = useState<"in" | "out">("in"); const [acc, setAcc] = useState(accounts[0]?.id ?? "");
+  return (
+    <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault();
+      const base = { investmentId, amount, date: today, accountId: acc || undefined };
+      run(() => (kind === "in" ? A.investContribute(base) : A.investWithdraw(base)), () => setAmount(0)); }}>
+      <div role="group" aria-label="Tipo de movimento" className="grid grid-cols-2 gap-1 rounded-md bg-surface-2 p-1">
+        {([["in", "Aporte"], ["out", "Resgate"]] as const).map(([k, l]) => (
+          <button type="button" key={k} aria-pressed={kind === k} onClick={() => setKind(k)} className={`rounded-sm py-2 text-sm font-bold ${kind === k ? "bg-accent text-on-accent" : "text-muted"}`}>{l}</button>
+        ))}
+      </div>
+      <MoneyInput cents={amount} onChange={setAmount} label="Valor" className="!text-xl" />
+      <select value={acc} onChange={(e) => setAcc(e.target.value)} aria-label="Conta" className={field}>
+        <option value="">Só registrar (não mexe em nenhuma conta)</option>
+        {accounts.map((a) => <option key={a.id} value={a.id}>{kind === "in" ? "Sai de" : "Cai em"}: {a.name}</option>)}
+      </select>
+      {kind === "out" && amount > value && <p className="text-sm text-expense">Maior que o valor atual do investimento.</p>}
+      <Msg error={error} done={done} /><Submit pending={pending}>{kind === "in" ? "Registrar aporte" : "Registrar resgate"}</Submit>
+    </form>
+  );
+}
+
+export function InvestValueForm({ investmentId, current, today }: { investmentId: string; current: number; today: string }) {
+  const { error, done, pending, run } = useAction();
+  const [value, setValue] = useState(current);
+  return (
+    <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); run(() => A.investValue({ investmentId, value, date: today })); }}>
+      <p className="text-sm text-muted">Informe quanto ele vale hoje (veja no app da corretora). É assim que a rentabilidade é calculada.</p>
+      <MoneyInput cents={value} onChange={setValue} label="Valor de hoje" className="!text-xl" />
+      <Msg error={error} done={done} /><Submit pending={pending}>Atualizar valor</Submit>
+    </form>
+  );
+}
+
+export function RecurringEditForm({ id, description, amount, categories, categoryId, endDate }: { id: string; description: string; amount: number; categories: Opt[]; categoryId: string; endDate: string | null }) {
+  const { error, done, pending, run } = useAction();
+  const [desc, setDesc] = useState(description); const [val, setVal] = useState(amount); const [cat, setCat] = useState(categoryId); const [end, setEnd] = useState(endDate ?? "");
+  return (
+    <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); run(() => A.editRecurring(id, { description: desc, amount: val, categoryId: cat, endDate: end || null })); }}>
+      <input value={desc} onChange={(e) => setDesc(e.target.value)} aria-label="Descrição" className={field} maxLength={120} />
+      <MoneyInput cents={val} onChange={setVal} label="Valor" className="!text-xl" />
+      <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoria" className={field}>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      <label className="text-sm text-muted">Termina em (opcional)<input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className={`${field} mt-1`} /></label>
+      <p className="text-xs text-muted">A mudança vale para as próximas contas ainda não pagas. O que já foi pago não muda.</p>
+      <Msg error={error} done={done} /><Submit pending={pending}>Salvar alterações</Submit>
+    </form>
+  );
+}

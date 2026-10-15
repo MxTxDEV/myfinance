@@ -5,6 +5,9 @@ import { dashboard } from "@/server/services/reports";
 import { generateRecurring } from "@/server/services/recurring";
 import { generateNotifications, unreadCount } from "@/server/services/notifications";
 import { Bell } from "lucide-react";
+import { ensureDailyMessage } from "@/server/services/daily";
+import { monthSummary } from "@/server/services/reports";
+import { DailyMessageCard } from "@/components/daily-message";
 import { goalsOverview } from "@/server/services/planning";
 import { Progress } from "@/components/ui";
 import { listTransactions } from "@/server/services/ledger";
@@ -24,7 +27,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
   const month = sp.m && /^\d{4}-(0[1-9]|1[0-2])$/.test(sp.m) ? sp.m : monthKey(today);
   await generateRecurring(today); // idempotente
   await generateNotifications(today); // idempotente (dedupeKey)
+  const daily = await ensureDailyMessage(); // mensagem das 06:00 (idempotente)
   const unread = await unreadCount();
+  const curMonth = await monthSummary(monthKey(today));
+  const dayOfMonth = today.getUTCDate();
   const [d, recent, categories, goals] = await Promise.all([
     dashboard(today, month),
     listTransactions({ sort: "date_desc" }),
@@ -54,6 +60,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
           <HideToggle />
         </div>
       </header>
+
+      <DailyMessageCard day={daily.day} text={daily.text} spent={curMonth.expense} perDay={Math.round(curMonth.expense / dayOfMonth)} />
 
       {noAccounts && (
         <Card>

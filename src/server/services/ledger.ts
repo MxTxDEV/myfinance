@@ -4,13 +4,13 @@ import { cents, dateIn, dateOut } from "../convert";
 
 export interface LedgerFilters {
   q?: string; from?: string; to?: string; categoryId?: string; accountId?: string; cardId?: string;
-  type?: "INCOME" | "EXPENSE" | "TRANSFER"; status?: "PLANNED" | "SETTLED";
+  type?: "INCOME" | "EXPENSE" | "TRANSFER" | "INVESTMENT"; status?: "PLANNED" | "SETTLED";
   sort?: "date_desc" | "date_asc" | "amount_desc" | "amount_asc"; page?: number;
 }
 export const PAGE_SIZE = 50;
 
 function where(f: LedgerFilters): Prisma.TransactionWhereInput {
-  const types = f.type === "TRANSFER" ? ["TRANSFER_IN", "TRANSFER_OUT"] : f.type ? [f.type] : undefined;
+  const types = f.type === "TRANSFER" ? ["TRANSFER_IN", "TRANSFER_OUT"] : f.type === "INVESTMENT" ? ["INVESTMENT_IN", "INVESTMENT_OUT"] : f.type ? [f.type] : undefined;
   return {
     deletedAt: null,
     // Transferências: mostra só a perna de saída para não duplicar o item no feed (a entrada fica no detalhe).

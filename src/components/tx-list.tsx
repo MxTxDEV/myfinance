@@ -10,7 +10,7 @@ import type { LedgerItem } from "@/server/services/ledger";
 
 export interface CatOpt { id: string; name: string; type: "INCOME" | "EXPENSE" }
 const field = "w-full rounded-md bg-surface-2 px-4 py-3 text-base outline-none focus-visible:ring-2 ring-accent";
-const incomeLike = (t: string) => t === "INCOME" || t === "TRANSFER_IN";
+const incomeLike = (t: string) => t === "INCOME" || t === "TRANSFER_IN" || t === "INVESTMENT_IN";
 
 function fmtDay(iso: string) {
   const dt = new Date(iso + "T12:00:00Z");
@@ -37,7 +37,7 @@ export function TxList({ items, categories, accounts = [], grouped = true }: { i
 
 function Row({ t, onOpen }: { t: LedgerItem; onOpen: () => void }) {
   const inc = t.type === "INCOME";
-  const transfer = t.type === "TRANSFER_OUT" || t.type === "TRANSFER_IN";
+  const transfer = t.type === "TRANSFER_OUT" || t.type === "TRANSFER_IN" || t.type === "INVESTMENT_IN" || t.type === "INVESTMENT_OUT"; // movimentos neutros (não são receita nem despesa)
   const out = !incomeLike(t.type);
   return (
     <button onClick={onOpen} className="flex min-h-16 w-full items-center gap-3 py-3 text-left">
@@ -103,7 +103,7 @@ function Detail({ t, categories, accounts, onClose }: { t: LedgerItem; categorie
             {confirmDel ? (
               <div className="flex flex-col gap-3 rounded-md bg-expense-bg p-4" role="alertdialog" aria-label="Confirmar exclusão">
                 <p className="text-sm font-medium">
-                  {t.transferId ? "Excluir esta transferência removerá as duas pontas." : isPlan ? "Excluir removerá todas as parcelas desta compra." : "Excluir esta movimentação? O saldo será recalculado."}
+                  {t.transferId ? "Excluir esta transferência removerá as duas pontas." : t.type.startsWith("INVESTMENT") ? "Excluir desfaz o aporte/resgate: o valor volta para a conta e o investimento é ajustado." : isPlan ? "Excluir removerá todas as parcelas desta compra." : "Excluir esta movimentação? O saldo será recalculado."}
                 </p>
                 <div className="flex gap-3">
                   <button onClick={() => setConfirmDel(false)} className="flex-1 rounded-md bg-surface py-3 font-semibold">Cancelar</button>

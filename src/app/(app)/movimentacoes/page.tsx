@@ -16,7 +16,7 @@ export default async function Movimentacoes({ searchParams }: { searchParams: Pr
     q: sp.q?.slice(0, 80) || undefined,
     from: sp.from && isoRe.test(sp.from) ? sp.from : undefined, to: sp.to && isoRe.test(sp.to) ? sp.to : undefined,
     categoryId: sp.categoryId || undefined, accountId: sp.accountId || undefined,
-    type: pick(sp.type, ["INCOME", "EXPENSE", "TRANSFER"] as const), status: pick(sp.status, ["PLANNED", "SETTLED"] as const),
+    type: pick(sp.type, ["INCOME", "EXPENSE", "TRANSFER", "INVESTMENT"] as const), status: pick(sp.status, ["PLANNED", "SETTLED"] as const),
     sort: pick(sp.sort, ["date_desc", "date_asc", "amount_desc", "amount_asc"] as const),
     page: Math.max(0, Number(sp.page) || 0),
   };

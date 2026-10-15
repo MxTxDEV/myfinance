@@ -136,5 +136,8 @@ export function ThemeSelect({ value }: { value: string }) {
 
 export function LogoutButton() {
   const router = useRouter();
-  return <button onClick={async () => { await A.logout(); router.replace("/login"); router.refresh(); }} className="rounded-md bg-surface-2 py-3.5 font-semibold">Sair</button>;
+  return <button onClick={async () => {
+    // Apaga as páginas salvas para uso offline (têm seus dados) antes de sair.
+    try { navigator.serviceWorker?.controller?.postMessage({ type: "clear-pages" }); const ks = await caches.keys(); await Promise.all(ks.filter((k) => k.startsWith("fos-pages")).map((k) => caches.delete(k))); } catch { /* ok */ }
+    await A.logout(); router.replace("/login"); router.refresh(); }} className="rounded-md bg-surface-2 py-3.5 font-semibold">Sair</button>;
 }
