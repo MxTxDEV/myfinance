@@ -127,6 +127,8 @@ model Profile {
   pushSubscriptions PushSubscription[]
   pushSlots         PushSlot[]
   apiTokens         ApiToken[]
+  bankLinks         BankLink[]
+  bankLinkAccounts  BankLinkAccount[]
 }
 
 enum Role {
@@ -138,6 +140,52 @@ enum Role {
 model Setting {
   key   String @id
   value Json
+}
+
+// Conexão bancária via Open Finance (Pluggy). Um "item" = uma instituição autorizada pelo usuário.
+model BankLink {
+  id         String    @id @default(cuid())
+  itemId     String
+  connector  String
+  status     String    @default("UPDATED")
+  lastSyncAt DateTime?
+  lastError  String?
+  createdAt  DateTime  @default(now())
+
+  accounts BankLinkAccount[]
+
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
+  @@index([userId])
+}
+
+// Conta/cartão do banco → conta/cartão do app (ou ainda sem destino).
+model BankLinkAccount {
+  id              String   @id @default(cuid())
+  linkId          String
+  pluggyAccountId String
+  name            String
+  kind            String // ACCOUNT | CARD
+  subtype         String?
+  balance         Decimal? @db.Decimal(14, 2)
+  creditLimit     Decimal? @db.Decimal(14, 2)
+  closingDay      Int?
+  dueDay          Int?
+  accountId       String?
+  cardId          String?
+  createdByLink   Boolean  @default(false) // conta/cartão criado pela conexão: saldo inicial é calculado a partir do saldo do banco
+  synced          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  link BankLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  userId String  @default("")
+  user   Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pluggyAccountId])
+  @@index([userId])
 }
 
 // Chave para lançamentos automáticos (Atalhos do iPhone, Tasker…). Só o hash é guardado.

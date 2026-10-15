@@ -112,6 +112,7 @@ export async function adminResetPassword(adminId: string, userId: string) {
 export async function deleteUserAndData(userId: string) {
   await prismaRaw.$transaction(async (tx) => {
     const w = { where: { userId } };
+    await tx.bankLinkAccount.deleteMany(w); await tx.bankLink.deleteMany(w);
     await tx.transaction.deleteMany(w);
     await tx.goalEntry.deleteMany(w); await tx.goal.deleteMany(w);
     await tx.budget.deleteMany(w);

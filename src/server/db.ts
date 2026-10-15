@@ -44,7 +44,7 @@ export function currentUserId(): string {
 
 const SCOPED = new Set([
   "Account", "Category", "Transfer", "CreditCard", "Invoice", "InstallmentPlan", "RecurringCommitment", "Transaction", "Budget",
-  "Goal", "GoalEntry", "Debt", "Asset", "Notification", "Investment", "InvestmentEntry", "PushSubscription", "PushSlot", "ApiToken",
+  "Goal", "GoalEntry", "Debt", "Asset", "Notification", "Investment", "InvestmentEntry", "PushSubscription", "PushSlot", "ApiToken", "BankLink", "BankLinkAccount",
 ]);
 
 const withoutOwner = <T,>(d: T): T => { if (d && typeof d === "object") { const c = { ...(d as object) } as Record<string, unknown>; delete c.userId; delete c.user; return c as T; } return d; };
