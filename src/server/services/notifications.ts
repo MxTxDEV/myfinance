@@ -5,6 +5,7 @@ import { cardOverview } from "./cards";
 import { monthSummary } from "./reports";
 import { addDays, addMonths, diffDays, monthKey, monthRange, todayBR, type DateOnly } from "@/domain/dates";
 import { dueStage } from "@/domain/schedule";
+import { budgetWin, debtPaid, goalDone, goalMilestone, monthWin, type Celebration } from "@/domain/celebrations";
 import { readPrefs } from "../push-prefs";
 import { formatBRL } from "@/domain/money";
 import type { NotificationType } from "@prisma/client";
@@ -78,9 +79,49 @@ export async function generateNotifications(today: DateOnly = todayBR()) {
   const s = await monthSummary(prev);
   if (prefs.alerts.monthlySummary && s.income + s.expense > 0) drafts.push({ type: "MONTHLY_SUMMARY", title: `Resumo de ${prev.split("-").reverse().join("/")}`, body: `Receitas ${formatBRL(s.income)}, despesas ${formatBRL(s.expense)}, resultado ${formatBRL(s.result)}.`, dedupeKey: `summary:${prev}` });
 
+  if (prefs.alerts.wins) drafts.push(...(await celebrationDrafts(today, prev, s)));
+
   const r = await prisma.notification.createMany({ data: drafts, skipDuplicates: true });
   return { created: r.count };
 }
+
+const monthLabel = (key: string) => new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(key + "-01T12:00:00Z"));
+
+/**
+ * Parabéns por conquistas: meta concluída (e marcos de 50% e 75%), dívida quitada, mês fechado no azul e
+ * orçamentos respeitados no mês anterior. Um por conquista (dedupeKey), nunca repetido. Sem valores em reais.
+ */
+async function celebrationDrafts(today: DateOnly, prev: string, prevSummary: Awaited<ReturnType<typeof monthSummary>>): Promise<Draft[]> {
+  const out: Draft[] = [];
+  const add = (c: Celebration, dedupeKey: string) => out.push({ type: "CELEBRATION", title: c.title, body: c.body, dedupeKey });
+
+  for (const g of (await goalsOverview(today)).items) {
+    if (g.percent >= 100) add(goalDone(g.name, g.id), `goal-done:${g.id}`);
+    else if (g.percent >= 75) add(goalMilestone(g.name, 75, g.id), `goal-ms:${g.id}:75`);
+    else if (g.percent >= 50) add(goalMilestone(g.name, 50, g.id), `goal-ms:${g.id}:50`);
+  }
+  const paid = await prisma.debt.findMany({ where: { archivedAt: null, balance: 0, payments: { some: { type: "DEBT_PAYMENT", deletedAt: null } } } });
+  for (const x of paid) add(debtPaid(x.name), `debt-paid:${x.id}`);
+  if (prevSummary.income > 0 && prevSummary.result > 0) add(monthWin(monthLabel(prev), prevSummary.savingsRate), `win:${prev}`);
+  const budgets = (await budgetOverview(prev)).items;
+  if (budgets.length > 0 && budgets.every((b) => b.spent <= b.limit)) add(budgetWin(monthLabel(prev), budgets.length), `budget-win:${prev}`);
+  return out;
+}
+
+/** Gera só as conquistas (usado logo após registrar um aporte de meta ou o pagamento de uma dívida). */
+export async function generateCelebrations(today: DateOnly = todayBR(), now: Date = new Date()) {
+  const prefs = readPrefs((await prisma.profile.findFirst())?.notifyPrefs);
+  if (!prefs.alerts.wins) return { created: 0 };
+  const prev = monthKey(addMonths(monthRange(monthKey(today)).start, -1));
+  const drafts = await celebrationDrafts(today, prev, await monthSummary(prev));
+  const r = await prisma.notification.createMany({ data: drafts.map((x) => ({ ...x, createdAt: now })), skipDuplicates: true }); // nasce no momento da conquista
+  return { created: r.count };
+}
+
+/** Conquistas ainda não dispensadas, dos últimos 7 dias (cartão de parabéns no Início). */
+export const recentCelebrations = (now: Date = new Date()) =>
+  prisma.notification.findMany({ where: { type: "CELEBRATION", readAt: null, createdAt: { gte: new Date(now.getTime() - 7 * 86_400_000) } }, orderBy: { createdAt: "desc" }, take: 2 });
+export const dismissNotification = (id: string) => prisma.notification.updateMany({ where: { id }, data: { readAt: new Date() } });
 
 export const unreadCount = () => prisma.notification.count({ where: { readAt: null } });
 export const listNotifications = () => prisma.notification.findMany({ orderBy: { createdAt: "desc" }, take: 50 });

@@ -9,7 +9,7 @@
 | 5 Qualidade | ✅ Testes, headers/CSP, a11y (axe), PWA, backup/restore testado · ⏳ ver pendências |
 
 ## Atualização — offline, investimentos, contas fixas e mensagens
-✅ App offline com fila e sincronização idempotente · ✅ Investimentos (aporte/resgate/valor/rentabilidade/distribuição) · ✅ Contas fixas (painel do mês, editar, encerrar, repetir) · ✅ 170 mensagens (gastar + investir, com emojis) em horários aleatórios 06:00–22:00 com menu de configuração · ✅ avisos push de vencimento de contas, faturas e dívidas (estágios 3/1/0 dias, agrupados) · ✅ som de caixa registradora.
+✅ App offline com fila e sincronização idempotente · ✅ Investimentos (aporte/resgate/valor/rentabilidade/distribuição) · ✅ Contas fixas (painel do mês, editar, encerrar, repetir) · ✅ 170 mensagens (gastar + investir, com emojis) em horários aleatórios 06:00–22:00 com menu de configuração · ✅ avisos push de vencimento de contas, faturas e dívidas (estágios 3/1/0 dias, agrupados) · ✅ parabéns por conquistas (meta, dívida, mês no azul, orçamento) · ✅ incentivo agressivo "não desista" · ✅ som de caixa registradora.
 Limitações: os horários aleatórios exigem um agendador externo chamando `/api/cron/tick` a cada 5 min (cron-job.org); som personalizado só dentro do app; push no iPhone exige app instalado; offline não permite editar/excluir.
 
 ## Testes

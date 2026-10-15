@@ -1,12 +1,13 @@
-import type { PushKind, PushSlot } from "@prisma/client";
+import type { NotificationType, PushKind, PushSlot } from "@prisma/client";
 import { prisma } from "../db";
 import { readPrefs, prefsKey, type PushPrefs } from "../push-prefs";
 import { pushConfigured, sendToAll } from "../push";
 import { ensureDailyMessage } from "./daily";
-import { generateNotifications } from "./notifications";
+import { generateCelebrations, generateNotifications } from "./notifications";
 import { generateRecurring } from "./recurring";
 import { MESSAGES, messageForDay, pickMessage, stripEmoji, styleMessage } from "@/domain/messages";
 import { INVEST_MESSAGES } from "@/domain/messages-invest";
+import { MOTIVATION_MESSAGES } from "@/domain/messages-motivation";
 import { localInstant, localParts, parseHHMM, randomMinutes } from "@/domain/schedule";
 import { parseISODate } from "@/domain/dates";
 
@@ -39,14 +40,14 @@ export async function ensureSchedule(now: Date, prefs: PushPrefs): Promise<PushS
     rows.push({ day, slot: slot++, at: localInstant(day, start), kind: "MORNING", message: messageForDay(day), prefsKey: key });
   }
 
-  const kinds: PushKind[] = [...(prefs.spend ? ["SPEND" as const] : []), ...(prefs.invest ? ["INVEST" as const] : [])];
+  const kinds: PushKind[] = [...(prefs.spend ? ["SPEND" as const] : []), ...(prefs.invest ? ["INVEST" as const] : []), ...(prefs.motivation ? ["MOTIVATION" as const] : [])];
   const already = used.filter((s) => s.kind !== "MORNING").length;
   const need = kinds.length === 0 ? 0 : Math.max(0, prefs.perDay - already);
   const from = Math.max(prefs.morning ? start + MORNING_GAP_MIN : start, stale || used.length ? minutes + 10 : 0);
   const mins = randomMinutes({ startMin: from, endMin: end, count: need, gapMin: prefs.minGapMinutes, seed: `${day}|${key}|${already}` });
   mins.forEach((m, i) => {
     const kind = kinds[(already + i) % kinds.length]; // alterna entre as categorias ligadas
-    const bank = kind === "INVEST" ? INVEST_MESSAGES : MESSAGES;
+    const bank = kind === "INVEST" ? INVEST_MESSAGES : kind === "MOTIVATION" ? MOTIVATION_MESSAGES : MESSAGES;
     rows.push({ day, slot: slot++, at: localInstant(day, m), kind, message: pickMessage(bank, dayNumber(day) * 10 + (already + i)), prefsKey: key });
   });
 
@@ -54,7 +55,7 @@ export async function ensureSchedule(now: Date, prefs: PushPrefs): Promise<PushS
   return prisma.pushSlot.findMany({ where: { day }, orderBy: { slot: "asc" } });
 }
 
-const TITLES: Record<PushKind, string> = { MORNING: "🌅 Bom dia — antes de gastar", SPEND: "🛑 Antes de gastar", INVEST: "📈 Que tal investir?" };
+const TITLES: Record<PushKind, string> = { MORNING: "🌅 Bom dia — antes de gastar", SPEND: "🛑 Antes de gastar", INVEST: "📈 Que tal investir?", MOTIVATION: "💪 Não desista" };
 
 /** Envia os horários que já chegaram. Cada horário é "reservado" antes do envio: dois agendadores nunca enviam o mesmo duas vezes. */
 export async function sendDueSlots(now: Date, prefs: PushPrefs) {
@@ -80,17 +81,18 @@ export async function sendDueSlots(now: Date, prefs: PushPrefs) {
 }
 
 const GROUPS = {
-  bills: ["DUE_SOON", "OVERDUE"], invoices: ["INVOICE_CLOSING", "INVOICE_DUE"], debts: ["DEBT_DUE"], budget: ["BUDGET"], goals: ["GOAL_STALLED"],
+  bills: ["DUE_SOON", "OVERDUE"], invoices: ["INVOICE_CLOSING", "INVOICE_DUE"], debts: ["DEBT_DUE"], budget: ["BUDGET"], goals: ["GOAL_STALLED"], wins: ["CELEBRATION"],
 } as const;
 
 /** Avisos de vencimento etc. viram push. Vários de uma vez saem agrupados em uma só notificação. Só dentro da janela do dia. */
-export async function sendAlertPushes(now: Date, prefs: PushPrefs) {
+export async function sendAlertPushes(now: Date, prefs: PushPrefs, opts: { only?: NotificationType[] } = {}) {
   const { minutes } = localParts(now);
   if (minutes < parseHHMM(prefs.windowStart)! || minutes > parseHHMM(prefs.windowEnd)!) return { sent: 0, alerts: 0 }; // silêncio fora da janela
   const types = (Object.keys(GROUPS) as (keyof typeof GROUPS)[]).filter((g) => prefs.alerts[g]).flatMap((g) => [...GROUPS[g]]);
   if (types.length === 0) return { sent: 0, alerts: 0 };
+  const wanted = opts.only ? types.filter((t) => opts.only!.includes(t)) : types;
   const pending = await prisma.notification.findMany({
-    where: { pushedAt: null, type: { in: types }, createdAt: { gte: new Date(now.getTime() - 24 * 3_600_000) } }, orderBy: { createdAt: "asc" },
+    where: { pushedAt: null, type: { in: wanted }, createdAt: { gte: new Date(now.getTime() - 24 * 3_600_000) } }, orderBy: { createdAt: "asc" },
   });
   const claimed = [];
   for (const n of pending) {
@@ -99,6 +101,15 @@ export async function sendAlertPushes(now: Date, prefs: PushPrefs) {
   }
   if (claimed.length === 0) return { sent: 0, alerts: 0 };
   const fmt = (t: string) => (prefs.emojis ? t : stripEmoji(t));
+  // Parabéns saem sozinhos (cada conquista é um momento); os avisos de vencimento saem agrupados.
+  let wins = 0;
+  for (const c of claimed.filter((n) => n.type === "CELEBRATION")) {
+    const r = await sendToAll({ title: fmt(c.title), body: fmt(c.body), url: "/", tag: `win-${c.id}` });
+    if (r.sent === 0) await prisma.notification.update({ where: { id: c.id }, data: { pushedAt: null } }); else wins++;
+  }
+  const rest = claimed.filter((n) => n.type !== "CELEBRATION");
+  if (rest.length === 0) return { sent: wins, alerts: claimed.length };
+  claimed.splice(0, claimed.length, ...rest);
   const payload = claimed.length === 1
     ? { title: fmt(claimed[0].title), body: fmt(claimed[0].body), url: "/notificacoes", tag: `alert-${claimed[0].id}` }
     : {
@@ -108,7 +119,7 @@ export async function sendAlertPushes(now: Date, prefs: PushPrefs) {
       };
   const r = await sendToAll(payload);
   if (r.sent === 0) await prisma.notification.updateMany({ where: { id: { in: claimed.map((c) => c.id) } }, data: { pushedAt: null } }); // ninguém recebeu: tenta de novo
-  return { sent: r.sent, alerts: claimed.length };
+  return { sent: r.sent + wins, alerts: claimed.length + wins };
 }
 
 /**
@@ -128,4 +139,15 @@ export async function runTick(now: Date = new Date()) {
   const due = await sendDueSlots(now, prefs);
   const alerts = await sendAlertPushes(now, prefs);
   return { day, slots: slots.length, ...due, alerts: alerts.alerts, push: "ok" as const };
+}
+
+/** Logo após uma conquista (meta, dívida): gera o parabéns e avisa na hora, sem esperar o próximo tick. Nunca derruba a ação que o chamou. */
+export async function celebrateNow(now: Date = new Date()) {
+  try {
+    await generateCelebrations(parseISODate(localParts(now).day), now);
+    const prefs = readPrefs((await prisma.profile.findFirst())?.notifyPrefs);
+    if (prefs.enabled && pushConfigured()) await sendAlertPushes(now, prefs, { only: ["CELEBRATION"] });
+  } catch (e) {
+    console.error("celebrateNow falhou", e instanceof Error ? e.name : "erro");
+  }
 }

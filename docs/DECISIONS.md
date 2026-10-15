@@ -61,7 +61,8 @@
 - **Envio exatamente uma vez:** o horário é reservado (`sentAt`) antes de enviar; se nenhum aparelho recebeu, a reserva é desfeita e tenta no próximo tick. Horário atrasado > 2 h é marcado como pulado.
 - **Avisos de vencimento por estágio:** cada conta/fatura/dívida gera no máximo um aviso por estágio (`dueStage`: o menor estágio já alcançado), com chave de idempotência por estágio; o push sai agrupado e só dentro da janela de horário (antes disso, fica pendente até ela abrir, por até 24 h).
 - O agendador é externo (cron-job.org, a cada 5 min); o app registra um batimento (`Heartbeat`) e avisa na tela se ele parar.
-- Mensagens: as de "pense antes de gastar" são texto puro e ganham um emoji estável por mensagem; as de investir já trazem emoji. Emojis desligados são removidos no envio. Push de mensagem não contém valores financeiros.
+- **Conquistas** (`CELEBRATION`): meta (100%, e marcos 50/75), dívida quitada (saldo zero **com** pagamento registrado), mês anterior no azul e todos os orçamentos do mês anterior respeitados. Um por conquista (dedupeKey), sem valores em reais no texto. Saem por push individualmente (nunca agrupadas com vencimentos) e na hora, ao registrar aporte/pagamento (`celebrateNow`), sem nunca derrubar a ação que as originou.
+- Mensagens: as de "pense antes de gastar" são texto puro e ganham um emoji estável por mensagem; as de investir e de incentivo já trazem emoji. O incentivo é duro mas não ofende (teste proíbe insultos). Emojis desligados são removidos no envio. Push de mensagem não contém valores financeiros.
 
 ## Segurança
 - Senha com scrypt (N=2¹⁵) + salt; sessão JWT HS256 em cookie `httpOnly`/`sameSite=lax`/`secure` (prod), 14 dias, validada no middleware (assinatura) e no servidor (versão no banco). Limite de tentativas de login em memória (instância única — aceitável para uso pessoal; em serverless considere um limitador externo).

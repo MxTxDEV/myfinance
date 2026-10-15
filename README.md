@@ -46,8 +46,9 @@ O app é instalável (PWA) e funciona sem internet:
 ## Mensagens e avisos (push)
 
 O que chega no celular (tudo configurável em **Início → sino → Organizar notificações**):
-- **Mensagem da manhã** (06:00) e **mensagens sorteadas** ao longo do dia, em horários aleatórios entre 06:00 e 22:00 (janela, quantidade de 0 a 10 por dia e intervalo mínimo ajustáveis). Duas categorias: **“pense antes de gastar”** (100 mensagens, em `src/domain/messages.ts`) e **“invista em vez de gastar”** (70, em `src/domain/messages-invest.ts`), alternadas; nenhuma repete antes de todas saírem. Emojis liga/desliga.
+- **Mensagem da manhã** (06:00) e **mensagens sorteadas** ao longo do dia, em horários aleatórios entre 06:00 e 22:00 (janela, quantidade de 0 a 10 por dia e intervalo mínimo ajustáveis). Três categorias, alternadas: **“pense antes de gastar”** (100 mensagens, `src/domain/messages.ts`), **“invista em vez de gastar”** (70, `src/domain/messages-invest.ts`) e **“incentivo / não desista”** (64, agressivas, no formato do que você perde se desistir — `src/domain/messages-motivation.ts`); nenhuma repete antes de todas saírem. Emojis liga/desliga.
 - **Avisos de vencimento**: contas e lançamentos previstos, faturas do cartão (fechamento e vencimento) e dívidas, 3 dias antes, 1 dia antes e no dia (escolha os momentos), mais atrasos. Vários avisos juntos viram **uma só** notificação. Orçamento, metas e resumo do mês são opcionais. Fora da janela de horário, nada é enviado.
+- **Parabéns por conquistas** (ligue/desligue em “Comemorar minhas conquistas”): meta concluída (e marcos de 50% e 75%), dívida quitada, mês fechado no azul e orçamentos respeitados. Chega por push (sozinho, na hora, quando você registra o aporte ou o pagamento) e vira um cartão verde no topo do Início até você dispensar. Textos em `src/domain/celebrations.ts`.
 - Os horários sorteados do dia aparecem na tela (“Hoje”); a mensagem só é mostrada depois de enviada.
 
 ### Configuração (uma vez)

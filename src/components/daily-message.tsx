@@ -107,7 +107,7 @@ export function PushSettings({ publicKey }: { publicKey: string | null }) {
       setSubscribed(false); setEndpoint(null);
     } finally { setBusy(false); }
   }
-  async function test(kind: "spend" | "invest" | "bill") {
+  async function test(kind: "spend" | "invest" | "motivation" | "bill" | "win") {
     if (!endpoint) return;
     setBusy(true); setMsg(null);
     try {
@@ -129,9 +129,9 @@ export function PushSettings({ publicKey }: { publicKey: string | null }) {
         <div className="flex flex-col gap-2">
           <p className="text-sm font-medium">Enviar um teste:</p>
           <div className="grid grid-cols-3 gap-2">
-            <button disabled={busy} onClick={() => test("spend")} className={`${btn} bg-surface-2 text-sm`}>Gastar</button>
-            <button disabled={busy} onClick={() => test("invest")} className={`${btn} bg-surface-2 text-sm`}>Investir</button>
-            <button disabled={busy} onClick={() => test("bill")} className={`${btn} bg-surface-2 text-sm`}>Vencimento</button>
+            {([["spend", "Gastar"], ["invest", "Investir"], ["motivation", "Incentivo"], ["bill", "Vencimento"], ["win", "Parabéns"]] as const).map(([k, l]) => (
+              <button key={k} disabled={busy} onClick={() => test(k)} className={`${btn} bg-surface-2 text-sm`}>{l}</button>
+            ))}
           </div>
           <button disabled={busy} onClick={disable} className={`${btn} flex items-center justify-center gap-2 bg-surface-2`}><BellOff className="size-4" aria-hidden />Desativar neste aparelho</button>
         </div>

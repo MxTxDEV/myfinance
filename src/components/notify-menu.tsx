@@ -48,6 +48,7 @@ export function NotifyMenu({ initial }: { initial: PushPrefs }) {
       <p className="text-xs text-muted">Os horários são sorteados todo dia dentro dessa janela. Fora dela você não recebe nada, nem avisos. Hoje: até {total} {total === 1 ? "mensagem" : "mensagens"}.</p>
       <Check checked={p.spend} onChange={(v) => set("spend", v)} hint="Mensagens duras para frear o gasto por impulso.">Pense antes de gastar</Check>
       <Check checked={p.invest} onChange={(v) => set("invest", v)} hint="Mensagens que incentivam investir em vez de gastar.">Invista em vez de gastar</Check>
+      <Check checked={p.motivation} onChange={(v) => set("motivation", v)} hint="Frases diretas sobre o que você perde se desistir.">Incentivo (não desista)</Check>
       <Check checked={p.emojis} onChange={(v) => set("emojis", v)}>Usar emojis 🔥</Check>
 
       <h3 className={sub}>Avisos de vencimento</h3>
@@ -58,6 +59,8 @@ export function NotifyMenu({ initial }: { initial: PushPrefs }) {
         <legend className="text-sm text-muted">Avisar</legend>
         <div className="flex flex-wrap gap-x-4">{STAGES.map(([n, l]) => <Check key={n} checked={p.stages.includes(n)} onChange={(v) => toggleStage(n, v)}>{l}</Check>)}</div>
       </fieldset>
+      <h3 className={sub}>Parabéns</h3>
+      <Check checked={p.alerts.wins} onChange={(v) => setAlert("wins", v)} hint="Meta concluída (e 50%, 75%), dívida quitada, mês no azul e orçamento respeitado.">Comemorar minhas conquistas 🏆</Check>
       <h3 className={sub}>Outros avisos</h3>
       <Check checked={p.alerts.budget} onChange={(v) => setAlert("budget", v)}>Orçamento chegando no limite</Check>
       <Check checked={p.alerts.goals} onChange={(v) => setAlert("goals", v)}>Metas sem progresso</Check>

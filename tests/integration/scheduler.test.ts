@@ -39,11 +39,11 @@ describe("horários do dia", () => {
     expect(mins[0]).toBe(6 * 60); // manhã exatamente às 06:00
     for (const m of mins) { expect(m).toBeGreaterThanOrEqual(6 * 60); expect(m).toBeLessThanOrEqual(22 * 60); }
     for (let i = 2; i < mins.length; i++) expect(mins[i] - mins[i - 1]).toBeGreaterThanOrEqual(60);
-    expect(a.slice(1).map((x) => x.kind).sort()).toEqual(["INVEST", "INVEST", "SPEND", "SPEND"]); // alterna as categorias
+    expect(a.slice(1).map((x) => x.kind)).toEqual(["SPEND", "INVEST", "MOTIVATION", "SPEND"]); // alterna as 3 categorias
     expect(new Set(a.map((x) => x.message)).size).toBe(5);
   });
   it("respeita as categorias escolhidas e a janela personalizada", async () => {
-    const a = await ensureSchedule(T("2026-10-16", "07:00"), prefs({ morning: false, invest: false, perDay: 3, windowStart: "09:00", windowEnd: "12:00", minGapMinutes: 30 }));
+    const a = await ensureSchedule(T("2026-10-16", "07:00"), prefs({ morning: false, invest: false, motivation: false, perDay: 3, windowStart: "09:00", windowEnd: "12:00", minGapMinutes: 30 }));
     expect(a.every((x) => x.kind === "SPEND")).toBe(true);
     for (const x of a) { const m = localParts(x.at).minutes; expect(m).toBeGreaterThanOrEqual(540); expect(m).toBeLessThanOrEqual(720); }
   });

@@ -186,7 +186,10 @@ test("menu de notificações: organizar horários, categorias e avisos (persiste
   await page.getByLabel("Mensagens sorteadas por dia").selectOption("3");
   await page.getByLabel("A partir de").fill("08:00");
   await page.getByLabel("Até", { exact: true }).fill("20:00");
+  await expect(page.getByLabel("Incentivo (não desista)")).toBeChecked();
+  await expect(page.getByLabel(/Comemorar minhas conquistas/)).toBeChecked();
   await page.getByLabel("Pense antes de gastar").uncheck();
+  await page.getByLabel("Incentivo (não desista)").uncheck();
   await page.getByLabel(/Usar emojis/).uncheck();
   await page.getByLabel("Faturas do cartão").uncheck();
   await page.getByRole("button", { name: "Salvar", exact: true }).click();
@@ -206,6 +209,30 @@ test("menu de notificações: organizar horários, categorias e avisos (persiste
   expect(times[0]).toBe("08:00");
   for (const t of times) { expect(t >= "08:00" && t <= "20:00").toBe(true); }
   await expect(hoje.getByText("Pensar antes de gastar")).toHaveCount(0);
+  await expect(hoje.getByText("Incentivo")).toHaveCount(0); // só "Investir" ficou ligado
+});
+
+test("parabéns: concluir uma meta mostra a conquista no Início e dá para dispensar", async ({ page }) => {
+  await login(page);
+  await page.goto("/planejamento?tab=metas");
+  await page.getByText("Nova meta").click();
+  await page.getByLabel("Nome da meta").fill("Meta relâmpago");
+  await page.getByLabel("Valor-alvo").fill("10000");
+  await page.getByRole("button", { name: "Criar meta" }).click();
+  await expect(page.getByRole("progressbar", { name: /Meta relâmpago/ })).toBeVisible();
+  await page.getByText("Aporte ou retirada").last().click();
+  await page.locator("details[open]").getByLabel("Valor", { exact: true }).fill("10000");
+  await page.getByRole("button", { name: "Registrar aporte" }).click();
+  await expect(page.getByRole("progressbar", { name: /Meta relâmpago: 100%/ })).toBeVisible();
+
+  await page.goto("/");
+  const win = page.getByRole("region", { name: "Conquista" }).filter({ hasText: "Meta relâmpago" });
+  await expect(win).toBeVisible();
+  await expect(win).toContainText(/concluiu|CONCLUÍDA|conseguiu|bateu/i);
+  await win.getByRole("button", { name: "Dispensar" }).click();
+  await expect(page.getByRole("region", { name: "Conquista" }).filter({ hasText: "Meta relâmpago" })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Conquista" }).filter({ hasText: "Meta relâmpago" })).toHaveCount(0); // continua dispensada
 });
 
 test("acessibilidade: sem violações sérias nas telas principais", async ({ page }) => {

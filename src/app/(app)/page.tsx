@@ -3,7 +3,8 @@ import { requireOwner } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { dashboard } from "@/server/services/reports";
 import { generateRecurring } from "@/server/services/recurring";
-import { generateNotifications, unreadCount } from "@/server/services/notifications";
+import { generateNotifications, recentCelebrations, unreadCount } from "@/server/services/notifications";
+import { CelebrationCard } from "@/components/celebration-card";
 import { Bell } from "lucide-react";
 import { ensureDailyMessage } from "@/server/services/daily";
 import { monthSummary } from "@/server/services/reports";
@@ -29,6 +30,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
   await generateNotifications(today); // idempotente (dedupeKey)
   const daily = await ensureDailyMessage(); // mensagem das 06:00 (idempotente)
   const unread = await unreadCount();
+  const wins = await recentCelebrations();
   const curMonth = await monthSummary(monthKey(today));
   const dayOfMonth = today.getUTCDate();
   const [d, recent, categories, goals] = await Promise.all([
@@ -60,6 +62,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
           <HideToggle />
         </div>
       </header>
+
+      <CelebrationCard items={wins.map((w) => ({ id: w.id, title: w.title, body: w.body }))} />
 
       <DailyMessageCard day={daily.day} text={daily.text} spent={curMonth.expense} perDay={Math.round(curMonth.expense / dayOfMonth)} />
 

@@ -70,6 +70,7 @@ enum NotificationType {
   INVOICE_DUE
   DAILY_MESSAGE
   DEBT_DUE
+  CELEBRATION // parabéns por uma conquista (meta, dívida quitada, mês no azul…)
 }
 
 enum InvestmentType {
@@ -408,6 +409,7 @@ enum PushKind {
   MORNING // mensagem da manhã (primeira do dia)
   SPEND   // "pense antes de gastar"
   INVEST  // incentivo a investir
+  MOTIVATION // incentivo "não desista" (o que você perde se parar)
 }
 
 // Um horário sorteado do dia para uma mensagem. (day, slot) único: gerar de novo nunca duplica.

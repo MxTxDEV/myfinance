@@ -15,7 +15,8 @@ import * as plan from "@/server/services/planning";
 import * as notif from "@/server/services/notifications";
 import * as inv from "@/server/services/investments";
 import { pushPrefsSchema } from "@/server/push-prefs";
-import { ensureSchedule } from "@/server/services/scheduler";
+import { celebrateNow, ensureSchedule } from "@/server/services/scheduler";
+import { dismissNotification } from "@/server/services/notifications";
 import { todayBR } from "@/domain/dates";
 
 export type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
@@ -58,10 +59,11 @@ export async function logout() { await endSession(); }
 export async function saveBudget(v: Parameters<typeof plan.upsertBudget>[0]) { return run(async () => { await plan.upsertBudget(v); }); }
 export async function removeBudget(id: string) { return run(async () => { await plan.deleteBudget(id); }); }
 export async function saveGoal(v: Parameters<typeof plan.createGoal>[0]) { return run(async () => { await plan.createGoal(v); }); }
-export async function saveGoalEntry(v: Parameters<typeof plan.addGoalEntry>[0]) { return run(async () => { await plan.addGoalEntry(v); }); }
+export async function saveGoalEntry(v: Parameters<typeof plan.addGoalEntry>[0]) { return run(async () => { await plan.addGoalEntry(v); await celebrateNow(); }); }
 export async function removeGoal(id: string) { return run(async () => { await plan.archiveGoal(id); }); }
 export async function saveDebt(v: Parameters<typeof plan.createDebt>[0]) { return run(async () => { await plan.createDebt(v); }); }
-export async function saveDebtPayment(v: Parameters<typeof plan.payDebt>[0]) { return run(async () => { await plan.payDebt(v); }); }
+export async function saveDebtPayment(v: Parameters<typeof plan.payDebt>[0]) { return run(async () => { await plan.payDebt(v); await celebrateNow(); }); }
+export async function dismissCelebration(id: string) { return run(async () => { await dismissNotification(id); }); }
 export async function saveAsset(v: Parameters<typeof plan.createAsset>[0]) { return run(async () => { await plan.createAsset(v); }); }
 export async function removeAsset(id: string) { return run(async () => { await plan.archiveAsset(id); }); }
 export async function changeAssetValue(id: string, value: number, on: string) { return run(async () => { await plan.updateAssetValue(id, value, on); }); }

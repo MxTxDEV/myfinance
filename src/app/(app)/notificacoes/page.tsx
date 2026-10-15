@@ -10,7 +10,7 @@ import { NotifyMenu } from "@/components/notify-menu";
 import { PushSettings } from "@/components/daily-message";
 import { MarkRead } from "./mark-read";
 
-const KIND = { MORNING: "🌅 Manhã", SPEND: "🛑 Pensar antes de gastar", INVEST: "📈 Investir" } as const;
+const KIND = { MORNING: "🌅 Manhã", SPEND: "🛑 Pensar antes de gastar", INVEST: "📈 Investir", MOTIVATION: "💪 Incentivo" } as const;
 
 export default async function Notificacoes() {
   const owner = await requireOwner();
