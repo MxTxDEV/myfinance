@@ -256,6 +256,8 @@ model Transaction {
   investmentId  String?
   // Idempotência de lançamentos enviados pela fila offline (UUID gerado no aparelho).
   clientId      String?           @unique
+  // Origem em extrato importado (OFX/CSV ou, no futuro, Open Finance): reimportar o mesmo arquivo nunca duplica.
+  importKey     String?           @unique
   deletedAt     DateTime?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt

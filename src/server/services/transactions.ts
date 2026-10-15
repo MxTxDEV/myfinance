@@ -25,12 +25,17 @@ export async function createTransaction(raw: TransactionInput) {
     const dup = await prisma.transaction.findUnique({ where: { clientId: v.clientId } });
     if (dup) return [dup]; // reenvio da fila offline: já foi salvo
   }
+  if (v.importKey) {
+    const dup = await prisma.transaction.findUnique({ where: { importKey: v.importKey } });
+    if (dup) return [dup]; // linha de extrato já importada
+  }
   try {
     return await createTransactionTx(v);
   } catch (e) {
     // Dois envios simultâneos do mesmo clientId: o banco barra o segundo; devolvemos o primeiro.
-    if (v.clientId && e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      const dup = await prisma.transaction.findUnique({ where: { clientId: v.clientId } });
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      const dup = v.clientId ? await prisma.transaction.findUnique({ where: { clientId: v.clientId } })
+        : v.importKey ? await prisma.transaction.findUnique({ where: { importKey: v.importKey } }) : null;
       if (dup) return [dup];
     }
     throw e;
@@ -61,7 +66,7 @@ async function createTransactionTx(v: TransactionInput) {
             ...base, status: "SETTLED", settledAt: new Date(), amount: dec(parts[i]), date: when,
             description: plan ? `${v.description} (${i + 1}/${v.installments})` : v.description,
             cardId: card.id, invoiceId: inv.id, planId: plan?.id, installmentNumber: plan ? i + 1 : undefined,
-            clientId: i === 0 ? v.clientId : undefined,
+            clientId: i === 0 ? v.clientId : undefined, importKey: i === 0 ? v.importKey : undefined,
           },
         }));
       }
@@ -73,7 +78,7 @@ async function createTransactionTx(v: TransactionInput) {
     const created = await tx.transaction.create({
       data: {
         ...base, status: v.status, settledAt: v.status === "SETTLED" ? new Date() : null, amount: dec(v.amount), date,
-        description: v.description, accountId: acc.id, clientId: v.clientId,
+        description: v.description, accountId: acc.id, clientId: v.clientId, importKey: v.importKey,
       },
     });
     return [await attachRepeat(tx, v, created.id, date)];

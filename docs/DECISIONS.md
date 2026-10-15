@@ -64,6 +64,12 @@
 - **Conquistas** (`CELEBRATION`): meta (100%, e marcos 50/75), dívida quitada (saldo zero **com** pagamento registrado), mês anterior no azul e todos os orçamentos do mês anterior respeitados. Um por conquista (dedupeKey), sem valores em reais no texto. Saem por push individualmente (nunca agrupadas com vencimentos) e na hora, ao registrar aporte/pagamento (`celebrateNow`), sem nunca derrubar a ação que as originou.
 - Mensagens: as de "pense antes de gastar" são texto puro e ganham um emoji estável por mensagem; as de investir e de incentivo já trazem emoji. O incentivo é duro mas não ofende (teste proíbe insultos). Emojis desligados são removidos no envio. Push de mensagem não contém valores financeiros.
 
+## Importação de extratos e vínculos
+- Fonte única de entrada: `previewStatement`/`commitStatement`; cada linha tem `importKey` (`conta|cartão : id do banco` ou hash data|valor|descrição + nº da ocorrência) com índice único. Reimportar nunca duplica, nem concorrente.
+- Duplicado "provável" (lançado à mão) é só sugestão: vem desmarcado, o usuário decide. Pagamento de fatura no extrato da conta vem desmarcado para não contar a despesa duas vezes.
+- Cartão: o sinal predominante do arquivo define o que é compra; o restante (pagamento/estorno) vem desmarcado.
+- Lançamento **vinculado** reutiliza os serviços existentes (dívida: `DEBT_PAYMENT`; investimento: `INVESTMENT_OUT/IN`; meta: reserva interna sem mexer no saldo da conta), por isso herda todas as validações. **Conservação do patrimônio** (teste de integração): Δ patrimônio = receitas − despesas + valorização.
+
 ## Segurança
 - Senha com scrypt (N=2¹⁵) + salt; sessão JWT HS256 em cookie `httpOnly`/`sameSite=lax`/`secure` (prod), 14 dias, validada no middleware (assinatura) e no servidor (versão no banco). Limite de tentativas de login em memória (instância única — aceitável para uso pessoal; em serverless considere um limitador externo).
 - Logs de erro não incluem dados financeiros. CSV neutraliza injeção de fórmulas.

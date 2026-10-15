@@ -34,6 +34,19 @@ Os testes de integração/E2E usam o banco `finance_os_test` (crie com `createdb
 3. Rode `npm run db:migrate` e `npm run db:seed-owner` uma vez apontando para o banco de produção.
 4. HTTPS é automático na Vercel; o app envia HSTS, CSP, `X-Frame-Options: DENY` e demais headers (`next.config.ts`).
 
+## Importar extrato do banco e fatura do cartão
+
+Em **Perfil → Importar extrato do banco ou fatura**: escolha a conta (extrato) ou o cartão (fatura), envie o arquivo **OFX ou CSV** baixado no app do banco, revise e confirme.
+- Reconhece formatos brasileiros (data dd/mm/aaaa, `1.234,56`, `;` ou `,`, colunas Débito/Crédito).
+- **Categoria sugerida** pelo que você já lançou com a mesma descrição; você ajusta antes de gravar.
+- **Não duplica:** reimportar o mesmo arquivo não cria nada de novo; lançamentos que você já digitou à mão (mesmo valor, ±1 dia) vêm desmarcados.
+- **Pagamento de fatura** no extrato da conta vem desmarcado (a fatura já foi contada nas compras do cartão; pague-a em Perfil → cartão → Pagar). Na fatura, pagamentos/estornos também ficam de fora.
+- O que é importado funciona como qualquer lançamento: saldo, fatura/limite, orçamento, relatórios, metas e patrimônio atualizam juntos.
+- Ligação **automática** com o banco (Open Finance): ver `docs/OPEN_FINANCE.md`.
+
+## Lançamento vinculado (tudo sincronizado)
+No RECEBI/GASTEI, em **Mais detalhes → Vincular a**, o mesmo lançamento pode pagar uma **dívida**, aportar em um **investimento**, guardar em uma **meta** ou resgatar um investimento. Ele atualiza a conta, o saldo da dívida/valor do investimento/progresso da meta, os relatórios e o patrimônio de uma vez. Um teste automático garante a conservação do patrimônio: só receitas, despesas e valorizações o alteram; transferências, aportes, resgates, pagamento de fatura/dívida e reserva de meta não.
+
 ## Offline
 
 O app é instalável (PWA) e funciona sem internet:

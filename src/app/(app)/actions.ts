@@ -14,6 +14,7 @@ import { suggestions } from "@/server/services/ledger";
 import * as plan from "@/server/services/planning";
 import * as notif from "@/server/services/notifications";
 import * as inv from "@/server/services/investments";
+import * as stmt from "@/server/services/statements";
 import { pushPrefsSchema } from "@/server/push-prefs";
 import { celebrateNow, ensureSchedule, runTick } from "@/server/services/scheduler";
 import { dismissNotification } from "@/server/services/notifications";
@@ -88,3 +89,6 @@ export async function removeInvestment(id: string) { return run(async () => { aw
 export async function editRecurring(id: string, v: Parameters<typeof rec.updateRecurring>[1]) { return run(async () => { await rec.updateRecurring(id, v); }); }
 export async function stopRecurring(id: string) { return run(() => rec.endRecurring(id)); }
 export async function runTickNow() { return run(() => runTick(new Date(), { manual: true })); }
+
+export async function previewStatement(v: Parameters<typeof stmt.previewStatement>[0]) { return run(() => stmt.previewStatement(v), { revalidate: false }); }
+export async function commitStatement(v: Parameters<typeof stmt.commitStatement>[0]) { return run(() => stmt.commitStatement(v)); }

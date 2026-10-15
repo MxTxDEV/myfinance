@@ -21,6 +21,7 @@ export const transactionInput = z
     attachmentUrl: z.string().url().optional(),
     // UUID gerado no aparelho: torna o reenvio da fila offline idempotente.
     clientId: z.string().uuid().optional(),
+    importKey: z.string().min(3).max(300).optional(), // extrato importado: impede importar a mesma linha duas vezes
     // Cria também um compromisso recorrente a partir desta movimentação (despesa/receita fixa).
     repeat: z.enum(["WEEKLY", "BIWEEKLY", "MONTHLY", "YEARLY"]).optional(),
   })

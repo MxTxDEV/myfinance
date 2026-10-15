@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Check, ChevronDown, CloudOff, X } from "lucide-react";
 import { MoneyInput } from "./money-input";
 import { CategoryIcon } from "./icons";
-import { getSuggestions, saveTransaction } from "@/app/(app)/actions";
+import { getSuggestions, investContribute, investWithdraw, saveDebtPayment, saveGoalEntry, saveTransaction } from "@/app/(app)/actions";
 import { enqueue } from "@/lib/outbox";
 
 export interface QuickAddData {
@@ -12,6 +12,9 @@ export interface QuickAddData {
   categories: { id: string; name: string; type: "INCOME" | "EXPENSE"; icon: string; favorite: boolean }[];
   accounts: { id: string; name: string }[];
   cards: { id: string; name: string }[];
+  debts: { id: string; name: string }[];
+  investments: { id: string; name: string }[];
+  goals: { id: string; name: string }[];
 }
 type Kind = "INCOME" | "EXPENSE";
 const Ctx = createContext<(k?: Kind) => void>(() => {});
@@ -50,6 +53,7 @@ function Sheet({ data, initial, onClose }: { data: QuickAddData; initial: Kind; 
   const [saved, setSaved] = useState(false);
   const [queued, setQueued] = useState(false); // salvo só no aparelho, aguardando internet
   const [clientId, setClientId] = useState(() => crypto.randomUUID());
+  const [link, setLink] = useState(""); // "debt:ID" | "inv:ID" | "invout:ID" | "goal:ID" — vincula o lançamento a dívida, investimento ou meta
   const [repeat, setRepeat] = useState<"" | "MONTHLY" | "WEEKLY" | "BIWEEKLY" | "YEARLY">("");
   const [sugs, setSugs] = useState<{ description: string; categoryId: string | null }[]>([]);
   const [pending, start] = useTransition();
@@ -61,7 +65,7 @@ function Sheet({ data, initial, onClose }: { data: QuickAddData; initial: Kind; 
 
   const firstAccount = data.accounts[0]?.id;
   useEffect(() => { // defaults ao trocar o tipo (deps primitivas: refresh do servidor não reseta o formulário)
-    setCategoryId(""); setTouchedCat(false); setPlanned(false); setInstallments(1);
+    setCategoryId(""); setTouchedCat(false); setPlanned(false); setInstallments(1); setLink("");
     setTarget(firstAccount ? `acc:${firstAccount}` : "");
     getSuggestions(kind).then((r) => r.ok && setSugs(r.data ?? [])).catch(() => {}); // offline: sem sugestões
   }, [kind, firstAccount]);
@@ -82,9 +86,26 @@ function Sheet({ data, initial, onClose }: { data: QuickAddData; initial: Kind; 
     e.preventDefault();
     setError(null);
     if (amount <= 0) return setError("Informe o valor");
-    if (!categoryId) return setError("Escolha uma categoria");
     if (!target) return setError("Cadastre uma conta em Perfil para começar");
     const [tkind, tid] = target.split(":");
+    if (link) {
+      // Vinculado: o mesmo lançamento atualiza conta, dívida/investimento/meta, relatórios e patrimônio de uma vez.
+      if (tkind === "card") return setError("Vínculos saem de uma conta, não do cartão.");
+      if (!navigator.onLine) return setError("Sem internet: lançamentos vinculados precisam de conexão.");
+      const [lk, lid] = link.split(":");
+      start(async () => {
+        try {
+          const r = lk === "debt" ? await saveDebtPayment({ debtId: lid, amount, date, accountId: tid })
+            : lk === "inv" ? await investContribute({ investmentId: lid, amount, date, accountId: tid })
+            : lk === "invout" ? await investWithdraw({ investmentId: lid, amount, date, accountId: tid })
+            : await saveGoalEntry({ goalId: lid, amount, date });
+          if (!r.ok) return setError(r.error);
+          setSaved(true); router.refresh();
+        } catch { setError("Não foi possível salvar agora. Tente de novo."); }
+      });
+      return;
+    }
+    if (!categoryId) return setError("Escolha uma categoria");
     const payload = {
       type: kind, amount, description: description.trim() || cats.find((c) => c.id === categoryId)!.name, date, categoryId,
       status: planned && tkind === "acc" ? ("PLANNED" as const) : ("SETTLED" as const),
@@ -181,6 +202,18 @@ function Sheet({ data, initial, onClose }: { data: QuickAddData; initial: Kind; 
             </button>
             {more && (
               <div className="flex flex-col gap-3 pop">
+                {!isCard && (kind === "EXPENSE" ? (data.debts.length + data.investments.length + data.goals.length > 0) : data.investments.length > 0) && (
+                  <label className="text-sm text-muted">Vincular a
+                    <select value={link} onChange={(e) => setLink(e.target.value)} className={`${field} mt-1`}>
+                      <option value="">Nenhum (gasto/receita comum)</option>
+                      {kind === "EXPENSE" && data.debts.length > 0 && <optgroup label="Pagar dívida">{data.debts.map((x) => <option key={x.id} value={`debt:${x.id}`}>{x.name}</option>)}</optgroup>}
+                      {kind === "EXPENSE" && data.investments.length > 0 && <optgroup label="Aportar em investimento">{data.investments.map((x) => <option key={x.id} value={`inv:${x.id}`}>{x.name}</option>)}</optgroup>}
+                      {kind === "EXPENSE" && data.goals.length > 0 && <optgroup label="Guardar para meta (reserva)">{data.goals.map((x) => <option key={x.id} value={`goal:${x.id}`}>{x.name}</option>)}</optgroup>}
+                      {kind === "INCOME" && data.investments.length > 0 && <optgroup label="Resgate de investimento">{data.investments.map((x) => <option key={x.id} value={`invout:${x.id}`}>{x.name}</option>)}</optgroup>}
+                    </select>
+                    {link && <span className="mt-1 block text-xs">Atualiza a conta, o {link.startsWith("debt") ? "saldo da dívida" : link.startsWith("goal") ? "progresso da meta" : "investimento"}, os relatórios e o patrimônio juntos.</span>}
+                  </label>
+                )}
                 {!isCard && (
                   <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={planned} onChange={(e) => setPlanned(e.target.checked)} className="size-5" />

@@ -266,6 +266,65 @@ test("diagnóstico: mostra por que não chega notificação e o botão de teste 
   await expect(page.getByText("Horário passou e não foi enviada").first()).toBeVisible().catch(() => {}); // depende da hora do teste
 });
 
+test("importar extrato OFX: revisar, gravar e reimportar sem duplicar", async ({ page }) => {
+  await login(page);
+  const ofx = `<OFX><STMTTRN><DTPOSTED>20261013<TRNAMT>-86.50<FITID>E2E1<MEMO>MERCADO TESTE IMPORT</STMTTRN>
+<STMTTRN><DTPOSTED>20261005<TRNAMT>4600.00<FITID>E2E2<MEMO>SALARIO TESTE IMPORT</STMTTRN>
+<STMTTRN><DTPOSTED>20261017<TRNAMT>-350.00<FITID>E2E3<MEMO>PAGAMENTO FATURA CARTAO ROXO</STMTTRN></OFX>`;
+  const file = { name: "extrato.ofx", mimeType: "application/x-ofx", buffer: Buffer.from(ofx) };
+  await page.goto("/perfil");
+  await page.getByText("Importar extrato do banco ou fatura").click();
+  await page.locator("details[open]").getByLabel("Importar para").selectOption({ label: "Banco" });
+  await page.getByLabel("Arquivo do extrato").setInputFiles(file);
+  await expect(page.getByText("3 de 3 selecionados").or(page.getByText("2 de 3 selecionados"))).toBeVisible();
+  await expect(page.getByText(/Pagamento de fatura: registre em Perfil/)).toBeVisible();
+  await expect(page.getByLabel("Importar PAGAMENTO FATURA CARTAO ROXO")).not.toBeChecked(); // não conta duas vezes
+  await page.getByLabel("Categoria de MERCADO TESTE IMPORT").selectOption({ label: "Mercado" });
+  await page.getByLabel("Categoria de SALARIO TESTE IMPORT").selectOption({ label: "Salário" });
+  await page.getByRole("button", { name: /^Importar 2 lançamento/ }).click();
+  await expect(page.getByText("2 importado(s)")).toBeVisible();
+
+  await page.goto("/movimentacoes?q=TESTE IMPORT");
+  await expect(page.getByRole("button", { name: /^MERCADO TESTE IMPORT/ })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /^SALARIO TESTE IMPORT/ })).toHaveCount(1);
+
+  // reimportar o mesmo arquivo: tudo vem como "já importado" e nada é duplicado
+  await page.goto("/perfil");
+  await page.getByText("Importar extrato do banco ou fatura").click();
+  await page.locator("details[open]").getByLabel("Importar para").selectOption({ label: "Banco" });
+  await page.getByLabel("Arquivo do extrato").setInputFiles(file);
+  await expect(page.getByText("0 de 3 selecionados")).toBeVisible();
+  await expect(page.getByText("Já importado antes.").first()).toBeVisible();
+  await page.goto("/movimentacoes?q=TESTE IMPORT");
+  await expect(page.getByRole("button", { name: /^MERCADO TESTE IMPORT/ })).toHaveCount(1);
+});
+
+test("vincular o lançamento a uma dívida atualiza conta e saldo devedor juntos", async ({ page }) => {
+  await login(page);
+  await page.goto("/planejamento?tab=dividas");
+  await page.getByText("Nova dívida").click();
+  await page.getByLabel("Nome da dívida").fill("Financiamento E2E");
+  await page.getByLabel("Valor original").fill("100000");
+  await page.getByRole("button", { name: "Cadastrar dívida" }).click();
+  await expect(page.getByText("Financiamento E2E")).toBeVisible();
+  await expect(page.getByText("R$ 1.000,00").first()).toBeVisible();
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "GASTEI" }).click();
+  await page.getByLabel("Valor", { exact: true }).fill("30000");
+  await page.getByRole("button", { name: /Mais detalhes/ }).click();
+  await page.getByLabel("Vincular a").selectOption({ label: "Financiamento E2E" });
+  await expect(page.getByText(/Atualiza a conta, o saldo da dívida/)).toBeVisible();
+  await page.getByRole("button", { name: "Salvar gasto" }).click();
+  await expect(page.getByText("Despesa registrada")).toBeVisible();
+  await page.getByRole("button", { name: "Concluir" }).click();
+
+  await page.goto("/planejamento?tab=dividas");
+  await expect(page.getByText("R$ 700,00").first()).toBeVisible(); // 1.000 − 300
+  await page.goto("/movimentacoes?q=Pagamento: Financiamento E2E");
+  await expect(page.getByRole("button", { name: /^Pagamento: Financiamento E2E/ })).toBeVisible();
+});
+
 test("acessibilidade: sem violações sérias nas telas principais", async ({ page }) => {
   await login(page);
   for (const url of ["/", "/movimentacoes", "/perfil", "/planejamento?tab=metas", "/planejamento?tab=investimentos", "/planejamento?tab=compromissos", "/notificacoes"]) {

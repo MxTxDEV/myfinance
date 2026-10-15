@@ -13,10 +13,13 @@ export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const owner = await requireOwner();
-  const [categories, accounts, cards] = await Promise.all([
+  const [categories, accounts, cards, debts, investments, goals] = await Promise.all([
     prisma.category.findMany({ where: { archivedAt: null }, orderBy: [{ favorite: "desc" }, { name: "asc" }] }),
     prisma.account.findMany({ where: { archivedAt: null }, orderBy: { createdAt: "asc" } }),
     prisma.creditCard.findMany({ where: { archivedAt: null }, orderBy: { createdAt: "asc" } }),
+    prisma.debt.findMany({ where: { archivedAt: null, balance: { gt: 0 } }, orderBy: { createdAt: "asc" } }),
+    prisma.investment.findMany({ where: { archivedAt: null }, orderBy: { createdAt: "asc" } }),
+    prisma.goal.findMany({ where: { archivedAt: null }, orderBy: { createdAt: "asc" } }),
   ]);
   return (
     <PrivacyProvider initial={owner.hideValues}>
@@ -27,6 +30,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           categories: categories.map((c) => ({ id: c.id, name: c.name, type: c.type, icon: c.icon, favorite: c.favorite })),
           accounts: accounts.map((a) => ({ id: a.id, name: a.name })),
           cards: cards.map((c) => ({ id: c.id, name: c.name })),
+          debts: debts.map((x) => ({ id: x.id, name: x.name })),
+          investments: investments.map((x) => ({ id: x.id, name: x.name })),
+          goals: goals.map((x) => ({ id: x.id, name: x.name })),
         }}
       >
         <Sidebar name={owner.name} />

@@ -5,6 +5,7 @@ import { cardOverview } from "@/server/services/cards";
 import { todayBR } from "@/domain/dates";
 import { Money } from "@/components/privacy";
 import { Card, Empty } from "@/components/ui";
+import { ImportStatement } from "@/components/import-statement";
 import { archiveAccount, archiveCard, archiveCategory, favoriteCategory } from "../actions";
 import { AccountForm, CardForm, CategoryForm, LogoutButton, PayInvoiceForm, RowAction, ThemeSelect, TransferForm } from "./forms";
 
@@ -81,6 +82,13 @@ export default async function Perfil() {
         )}
         {accounts.length > 0 && <details className="mt-3"><summary className="cursor-pointer py-2 font-semibold text-accent">Novo cartão</summary><div className="pt-3"><CardForm accounts={accounts} /></div></details>}
       </Card>
+
+      {(accounts.length > 0 || cards.length > 0) && (
+        <details className={det}>
+          <summary className={sm}>Importar extrato do banco ou fatura</summary>
+          <div className="p-4 pt-0"><ImportStatement accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} cards={cards.map((c) => ({ id: c.id, name: c.name }))} categories={categories.map((c) => ({ id: c.id, name: c.name, type: c.type }))} /></div>
+        </details>
+      )}
 
       <details className={det}>
         <summary className={sm}>Categorias</summary>
