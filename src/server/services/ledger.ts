@@ -14,7 +14,7 @@ function where(f: LedgerFilters): Prisma.TransactionWhereInput {
   return {
     deletedAt: null,
     // Transferências: mostra só a perna de saída para não duplicar o item no feed (a entrada fica no detalhe).
-    NOT: { type: "TRANSFER_IN" },
+    NOT: { type: { in: ["TRANSFER_IN", "CARD_BALANCE"] } }, // saldo informado da fatura não é um lançamento: vive na tela do cartão
     ...(types ? { type: { in: types as Prisma.EnumTransactionTypeFilter["in"] } } : {}),
     ...(f.q ? { description: { contains: f.q, mode: "insensitive" } } : {}),
     ...(f.from || f.to ? { date: { ...(f.from ? { gte: dateIn(f.from) } : {}), ...(f.to ? { lte: dateIn(f.to) } : {}) } } : {}),

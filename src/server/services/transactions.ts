@@ -111,7 +111,7 @@ export async function settleTransaction(id: string, opts: { date?: string; accou
   });
 }
 
-const LOCKED = ["TRANSFER_IN", "TRANSFER_OUT", "INVOICE_PAYMENT", "DEBT_PAYMENT", "INVESTMENT_IN", "INVESTMENT_OUT"];
+const LOCKED = ["CARD_BALANCE", "TRANSFER_IN", "TRANSFER_OUT", "INVOICE_PAYMENT", "DEBT_PAYMENT", "INVESTMENT_IN", "INVESTMENT_OUT"];
 
 export async function updateTransaction(id: string, raw: TransactionUpdate) {
   const v = transactionUpdate.parse(raw);

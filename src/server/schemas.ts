@@ -85,6 +85,7 @@ export const cardInput = z.object({
   closingDay: z.number().int().min(1).max(31),
   dueDay: z.number().int().min(1).max(31),
   payAccountId: id,
+  monthlyRate: z.number().min(0).max(100).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#7C3AED"),
 });
 export type CardInput = z.infer<typeof cardInput>;

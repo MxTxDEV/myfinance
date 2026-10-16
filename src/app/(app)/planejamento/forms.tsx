@@ -54,13 +54,13 @@ export function GoalEntryForm({ goalId, today }: { goalId: string; today: string
 export function DebtForm() {
   const { error, done, pending, run } = useAction();
   const [name, setName] = useState(""); const [creditor, setCreditor] = useState(""); const [orig, setOrig] = useState(0); const [bal, setBal] = useState(0);
-  const [kind, setKind] = useState("OUTRO"); const [rate, setRate] = useState(""); const [inst, setInst] = useState(0); const [n, setN] = useState(""); const [next, setNext] = useState("");
+  const [kind, setKind] = useState("VEICULO"); const [rate, setRate] = useState(""); const [inst, setInst] = useState(0); const [n, setN] = useState(""); const [next, setNext] = useState("");
   return (
     <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault();
       run(() => A.saveDebt({ name, creditor: creditor || undefined, originalAmount: orig, balance: bal || orig, monthlyRate: rate ? Number(rate.replace(",", ".")) : undefined,
         installmentAmount: inst || undefined, installmentsTotal: n ? Number(n) : undefined, nextDueDate: next || undefined, kind: kind as "OUTRO" }), () => { setName(""); setOrig(0); setBal(0); setInst(0); setRate(""); }); }}>
       <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Tipo de dívida" className={field}>
-        <option value="CARTAO">Cartão de crédito</option><option value="VEICULO">Carro / moto</option><option value="FINANCIAMENTO">Financiamento</option><option value="EMPRESTIMO">Empréstimo</option><option value="OUTRO">Outra dívida</option>
+        <option value="VEICULO">Carro / moto</option><option value="FINANCIAMENTO">Financiamento</option><option value="EMPRESTIMO">Empréstimo</option><option value="OUTRO">Outra dívida</option>
       </select>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da dívida" aria-label="Nome da dívida" required className={field} />
       <input value={creditor} onChange={(e) => setCreditor(e.target.value)} placeholder="Credor" aria-label="Credor" className={field} />
@@ -276,6 +276,36 @@ export function PlanPrefsForm({ income, detected, variable, strategy }: { income
         </select>
       </label>
       <Msg error={error} done={done} /><Submit pending={pending}>Salvar e recalcular</Submit>
+    </form>
+  );
+}
+
+/** O que cada fatura já tem (compras e parcelas de antes de usar o app). Compras novas entram por cima, sozinhas. */
+export function InvoiceBasesForm({ cardId, rows }: { cardId: string; rows: { referenceMonth: string; label: string; base: number }[] }) {
+  const { error, done, pending, run } = useAction();
+  const [v, setV] = useState<Record<string, number>>(() => Object.fromEntries(rows.map((r) => [r.referenceMonth, r.base])));
+  return (
+    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); run(() => A.saveInvoiceBases(cardId, rows.map((r) => ({ referenceMonth: r.referenceMonth, amount: v[r.referenceMonth] ?? 0 })))); }}>
+      <p className="text-sm text-muted">Digite quanto <b>já está</b> em cada fatura: compras que você já fez e parcelas dos meses seguintes. O que você lançar no app daqui em diante soma sozinho por cima. Deixe R$ 0,00 onde não houver nada.</p>
+      {rows.map((r) => (
+        <div key={r.referenceMonth}>
+          <p className="text-sm font-medium">{r.label}</p>
+          <MoneyInput cents={v[r.referenceMonth] ?? 0} onChange={(c) => setV((x) => ({ ...x, [r.referenceMonth]: c }))} label={`Fatura ${r.label}`} className="!text-xl" />
+        </div>
+      ))}
+      <Msg error={error} done={done} /><Submit pending={pending}>Salvar faturas</Submit>
+    </form>
+  );
+}
+
+export function CardEditForm({ id, limit, rate }: { id: string; limit: number; rate: number | null }) {
+  const { error, done, pending, run } = useAction();
+  const [lim, setLim] = useState(limit); const [r, setR] = useState(rate ? String(rate).replace(".", ",") : "");
+  return (
+    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); run(() => A.editCard(id, { limit: lim, monthlyRate: r ? Number(r.replace(",", ".")) : 0 })); }}>
+      <p className="-mb-1 text-sm text-muted">Limite total</p><MoneyInput cents={lim} onChange={setLim} label="Limite do cartão" className="!text-xl" />
+      <input value={r} onChange={(e) => setR(e.target.value)} placeholder="Juros % ao mês (usado no plano de quitação)" aria-label="Juros do cartão ao mês" inputMode="decimal" className={field} />
+      <Msg error={error} done={done} /><Submit pending={pending}>Salvar</Submit>
     </form>
   );
 }

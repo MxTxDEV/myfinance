@@ -343,7 +343,7 @@ test("vincular o lançamento a uma dívida atualiza conta e saldo devedor juntos
   await page.getByLabel("Nome da dívida").fill("Financiamento E2E");
   await page.getByLabel("Valor original").fill("100000");
   await page.getByRole("button", { name: "Cadastrar dívida" }).click();
-  await expect(page.getByText("Financiamento E2E")).toBeVisible();
+  await expect(page.getByText("Financiamento E2E").first()).toBeVisible();
   await expect(page.getByText("R$ 1.000,00").first()).toBeVisible();
 
   await page.goto("/");
@@ -364,7 +364,7 @@ test("vincular o lançamento a uma dívida atualiza conta e saldo devedor juntos
 
 test("acessibilidade: sem violações sérias nas telas principais", async ({ page }) => {
   await login(page);
-  for (const url of ["/", "/movimentacoes", "/perfil", "/planejamento?tab=metas", "/planejamento?tab=dividas", "/planejamento?tab=investimentos", "/planejamento?tab=compromissos", "/notificacoes"]) {
+  for (const url of ["/", "/movimentacoes", "/perfil", "/planejamento?tab=metas", "/planejamento?tab=dividas", "/planejamento?tab=cartoes", "/planejamento?tab=investimentos", "/planejamento?tab=compromissos", "/notificacoes"]) {
     await page.goto(url);
     await page.locator("main").waitFor();
     await page.waitForTimeout(800); // deixa as animações assentarem (a rede nunca fica ociosa: há sincronização em segundo plano)
@@ -402,7 +402,7 @@ test("plano de dívidas: renda, despesa fixa, cartão e carro geram o quanto pos
   await expect(page.getByText("Salvo ✓").first()).toBeVisible();
 
   // cartão e carro
-  for (const [name, kind, bal, rate, inst] of [["Cartão Inter", "CARTAO", "500000", "12", "80000"], ["Carro", "VEICULO", "3000000", "1,8", "120000"]]) {
+  for (const [name, kind, bal, rate, inst] of [["Empréstimo Inter", "EMPRESTIMO", "500000", "12", "80000"], ["Carro", "VEICULO", "3000000", "1,8", "120000"]]) {
     const nova = page.locator("details", { has: page.locator("summary", { hasText: "Nova dívida" }) });
     if (!(await nova.evaluate((e) => (e as HTMLDetailsElement).open))) await nova.locator("summary").click();
     await nova.getByLabel("Tipo de dívida").selectOption(kind);
@@ -415,7 +415,42 @@ test("plano de dívidas: renda, despesa fixa, cartão e carro geram o quanto pos
   }
   await expect(page.getByText("Plano para quitar tudo")).toBeVisible();
   await expect(page.getByText(/Livre em \d{2}\/\d{4}/)).toBeVisible();
-  await expect(page.getByText(/1º Cartão Inter/)).toBeVisible(); // maior juro primeiro
+  await expect(page.getByText(/1º Empréstimo Inter/)).toBeVisible(); // maior juro primeiro
   await expect(page.getByText("Despesas fixas (1)")).toBeVisible();
   await expect(page.getByText("Extra para quitar dívidas")).toBeVisible();
+});
+
+test("aba Cartões: cadastrar cartão, informar fatura atual, próxima e parcelas; o total usado soma tudo", async ({ page }) => {
+  await login(page);
+  await page.goto("/perfil");
+  if (!(await page.getByText("Conta Plano").count())) {
+    await page.getByText("Nova conta").click();
+    await page.getByLabel("Nome da conta").fill("Conta Plano");
+    await page.getByRole("button", { name: /salvar|criar/i }).first().click();
+    await expect(page.getByText("Conta Plano").first()).toBeVisible();
+  }
+  await page.goto("/planejamento?tab=cartoes");
+  await page.locator("summary", { hasText: "Novo cartão" }).click();
+  await page.getByLabel("Nome do cartão").fill("Nubank Teste");
+  await page.getByLabel("Limite total").fill("500000");
+  await page.getByRole("button", { name: "Criar cartão" }).click();
+  await expect(page.getByRole("region", { name: "Cartão Nubank Teste" })).toBeVisible();
+
+  const card = page.getByRole("region", { name: "Cartão Nubank Teste" });
+  await card.locator("summary", { hasText: "Informar o que cada fatura já tem" }).click();
+  await card.getByLabel(/^Fatura Fatura atual/).fill("120000");
+  await card.getByLabel(/^Fatura Próxima fatura/).fill("80000");
+  await card.getByLabel(/^Fatura Fatura · vence/).first().fill("30000"); // parcela dos meses seguintes
+  await card.getByRole("button", { name: "Salvar faturas" }).click();
+  await expect(card.getByText(/informado R\$ 1\.200,00/)).toBeVisible(); // a tela atualiza depois de salvar
+
+  await page.reload();
+  const region = page.getByRole("region", { name: "Cartão Nubank Teste" });
+  await expect(region.getByText("R$ 1.200,00").first()).toBeVisible(); // fatura atual
+  await expect(region.getByText("R$ 800,00").first()).toBeVisible(); // próxima
+  await expect(region.getByText(/Usado R\$ 2\.300,00/)).toBeVisible(); // 1.200 + 800 + 300 (parcela dos meses seguintes)
+  // a dívida do cartão aparece sozinha no plano
+  await page.goto("/planejamento?tab=dividas");
+  await expect(page.getByText("Cartões de crédito (automático)")).toBeVisible();
+  await expect(page.getByText("Nubank Teste").first()).toBeVisible();
 });

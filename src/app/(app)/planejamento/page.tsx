@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { currentProfile, prisma } from "@/server/db";
+import { cardOverview, cardTimeline } from "@/server/services/cards";
 import { financialPlan } from "@/server/services/plan";
 import { accountBalances } from "@/server/services/accounts";
 import { budgetOverview, debtsOverview, goalsOverview, netWorthOverview } from "@/server/services/planning";
@@ -13,10 +14,11 @@ import { Money } from "@/components/privacy";
 import { Card, Empty, MonthNav, Progress } from "@/components/ui";
 import { TxList } from "@/components/tx-list";
 import { SeriesChart } from "@/components/series-chart";
-import { pauseRecurring, removeAsset, removeDebt, removeBudget, removeGoal, removeInvestment, settle, stopRecurring } from "../actions";
-import { AssetForm, BudgetForm, DebtEditForm, DebtForm, DebtPayForm, FixedExpenseForm, PlanPrefsForm, GoalEntryForm, GoalForm, INV_LABEL, InvestmentForm, InvestMoveForm, InvestValueForm, RecurringEditForm, RecurringForm, RowBtn } from "./forms";
+import { archiveCard, pauseRecurring, removeAsset, removeDebt, removeBudget, removeGoal, removeInvestment, settle, stopRecurring } from "../actions";
+import { CardForm, PayInvoiceForm } from "../perfil/forms";
+import { AssetForm, BudgetForm, CardEditForm, DebtEditForm, InvoiceBasesForm, DebtForm, DebtPayForm, FixedExpenseForm, PlanPrefsForm, GoalEntryForm, GoalForm, INV_LABEL, InvestmentForm, InvestMoveForm, InvestValueForm, RecurringEditForm, RecurringForm, RowBtn } from "./forms";
 
-const TABS = [["orcamentos", "Orçamentos"], ["metas", "Metas"], ["dividas", "Dívidas"], ["investimentos", "Investimentos"], ["patrimonio", "Patrimônio"], ["compromissos", "Contas fixas"], ["relatorios", "Relatórios"]] as const;
+const TABS = [["orcamentos", "Orçamentos"], ["metas", "Metas"], ["dividas", "Dívidas"], ["cartoes", "Cartões"], ["investimentos", "Investimentos"], ["patrimonio", "Patrimônio"], ["compromissos", "Contas fixas"], ["relatorios", "Relatórios"]] as const;
 const REC: Record<string, string> = { WEEKLY: "Semanal", BIWEEKLY: "Quinzenal", MONTHLY: "Mensal", YEARLY: "Anual", CUSTOM: "Personalizado" };
 const LEVEL = { ok: "accent", attention: "accent", near: "warning", over: "expense" } as const;
 const ASSET: Record<string, string> = { VEHICLE: "Veículo", PROPERTY: "Imóvel", EQUIPMENT: "Equipamento", INVESTMENT: "Investimento", OTHER: "Outro" };
@@ -44,6 +46,7 @@ export default async function Planejamento({ searchParams }: { searchParams: Pro
       {tab === "orcamentos" && <Budgets month={month} categories={categories.filter((c) => c.type === "EXPENSE")} />}
       {tab === "metas" && <Goals accounts={accounts} iso={iso} />}
       {tab === "dividas" && <Debts accounts={accounts} iso={iso} />}
+      {tab === "cartoes" && <Cards accounts={accounts} iso={iso} />}
       {tab === "investimentos" && <Investments accounts={accounts} iso={iso} />}
       {tab === "patrimonio" && <NetWorth iso={iso} />}
       {tab === "compromissos" && <Commitments categories={categories} accounts={accounts} iso={iso} month={month} />}
@@ -163,7 +166,7 @@ async function Debts({ accounts, iso }: { accounts: { id: string; name: string }
         )}
       </section>
 
-      {debts.length > 0 && (
+      {p.debts.length > 0 && (
         <section className="rounded-lg border border-border bg-surface p-5" aria-label="Plano de quitação">
           <p className="text-sm font-medium text-muted">Plano para quitar tudo</p>
           {p.result.months === null ? (
@@ -185,11 +188,21 @@ async function Debts({ accounts, iso }: { accounts: { id: string; name: string }
 
       <details className={det}><summary className={sum}>Ajustar renda, gasto e ordem</summary><div className="p-4 pt-0"><PlanPrefsForm income={p.prefs.income} detected={p.detectedIncome} variable={p.prefs.variable} strategy={p.prefs.strategy} /></div></details>
 
+      {p.debts.some((x) => x.auto) && (
+        <Card title="Cartões de crédito (automático)">
+          <ul className="divide-y divide-border text-sm">
+            {p.debts.filter((x) => x.auto).map((x) => (
+              <li key={x.id} className="flex items-center justify-between gap-2 py-2"><span className="min-w-0 truncate">{x.name}{x.payoffDate ? <span className="text-muted"> · quitado em {monthYear(x.payoffDate)}</span> : ""}</span><Money cents={x.balance} className="shrink-0 font-semibold" /></li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-muted">Sobe sozinho a cada compra no cartão. Detalhes, faturas e parcelas na aba <Link href="/planejamento?tab=cartoes" className="font-semibold text-accent">Cartões</Link>.</p>
+        </Card>
+      )}
       <h2 className="px-1 font-bold">Minhas dívidas</h2>
-      {debts.length === 0 ? <Card><Empty title="Nenhuma dívida cadastrada" hint="Cadastre o cartão, o carro, financiamentos e empréstimos para eu montar o plano de quitação." /></Card> : (
+      {debts.length === 0 ? <Card><Empty title="Nenhuma dívida cadastrada" hint="Cadastre o carro, financiamentos e empréstimos para eu montar o plano de quitação. Os cartões ficam na aba Cartões e entram sozinhos." /></Card> : (
         <ul className="flex flex-col gap-3">
           {debts.map((x) => {
-            const pl = p.debts.find((d) => d.id === x.id);
+            const pl = p.debts.find((d) => d.id === x.id && !d.auto);
             return (
               <li key={x.id} className="rounded-md border border-border bg-surface p-4">
                 <p className="font-bold">{x.name} <span className="text-sm font-normal text-muted">{KIND_LABEL[x.kind] ?? "Dívida"}{x.creditor ? ` · ${x.creditor}` : ""}</span></p>
@@ -225,6 +238,68 @@ async function Debts({ accounts, iso }: { accounts: { id: string; name: string }
         <details className="mt-3"><summary className="cursor-pointer py-1 font-semibold text-accent">Adicionar despesa fixa</summary><div className="pt-2"><FixedExpenseForm accounts={accounts} cards={cards.map((c) => ({ id: c.id, name: c.name }))} /></div></details>
         <p className="mt-2 text-xs text-muted">Para editar ou encerrar uma despesa, use a aba “Contas fixas”.</p>
       </Card>
+    </>
+  );
+}
+
+const INV_STATUS: Record<string, string> = { OPEN: "Aberta", CLOSED: "Fechada", PAID: "Paga", PARTIAL: "Parcial", OVERDUE: "Atrasada" };
+const brDate = (d: string) => d.split("-").reverse().join("/");
+
+async function Cards({ accounts, iso }: { accounts: { id: string; name: string }[]; iso: string }) {
+  const [cards, rows] = await Promise.all([cardOverview(), prisma.creditCard.findMany({ where: { archivedAt: null } })]);
+  const timelines = await Promise.all(cards.map((c) => cardTimeline(c.id, undefined, 6)));
+  const totalUsed = cards.reduce((s, c) => s + c.used, 0), totalLimit = cards.reduce((s, c) => s + c.limit, 0);
+  const dueSoon = timelines.flatMap((t) => t.filter((i) => i.remaining > 0 && i.status !== "OPEN").map((i) => i.remaining)).reduce((a, b) => a + b, 0);
+  return (
+    <>
+      {cards.length > 0 && (
+        <section className="rounded-lg border border-border bg-surface p-5" aria-label="Resumo dos cartões">
+          <p className="text-sm font-medium text-muted">Total usado nos cartões</p>
+          <p className="mt-1 text-4xl font-bold"><Money cents={totalUsed} /></p>
+          <p className="text-sm text-muted">de <Money cents={totalLimit} /> de limite ({totalLimit ? Math.round((totalUsed / totalLimit) * 100) : 0}%) em {cards.length} {cards.length === 1 ? "cartão" : "cartões"}.{dueSoon > 0 && <> Faturas fechadas a pagar: <Money cents={dueSoon} className="font-semibold text-expense" />.</>}</p>
+          <p className="mt-2 text-xs text-muted">Cada compra ou parcela que você lança em um cartão entra sozinha na fatura certa e sobe esse total. O “usado” inclui as parcelas dos meses seguintes.</p>
+        </section>
+      )}
+      {cards.length === 0 && <Card><Empty title="Nenhum cartão" hint={accounts.length ? "Cadastre seus cartões abaixo, um por um." : "Crie uma conta em Perfil antes de cadastrar um cartão."} /></Card>}
+      {cards.map((c, idx) => {
+        const tl = timelines[idx];
+        const cur = tl[0], next = tl[1];
+        const pct = c.limit ? Math.round((c.used / c.limit) * 100) : 0;
+        const rate = rows.find((r) => r.id === c.id)?.monthlyRate;
+        return (
+          <section key={c.id} className="rounded-lg border border-border bg-surface p-5" aria-label={`Cartão ${c.name}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0"><p className="truncate text-lg font-bold">{c.name}</p><p className="text-xs text-muted">Fecha dia {c.closingDay} · vence dia {c.dueDay}{rate ? ` · ${String(rate).replace(".", ",")}% ao mês` : ""}</p></div>
+              <RowBtn label="Arquivar" danger confirm="Arquivar este cartão? O histórico é mantido." onRun={archiveCard.bind(null, c.id)} />
+            </div>
+            <div className="my-3"><Progress value={Math.min(100, pct)} label={`${c.name}: ${pct}% do limite usado`} tone={pct >= 90 ? "expense" : pct >= 70 ? "warning" : "accent"} /></div>
+            <p className="text-sm">Usado <Money cents={c.used} className="font-bold" /> de <Money cents={c.limit} /> <span className="text-muted">({pct}%)</span> · disponível <Money cents={c.available} className="font-semibold text-income" /></p>
+            <dl className="mt-3 grid grid-cols-2 gap-3">
+              <div className="rounded-md bg-surface-2 p-3"><dt className="text-xs text-muted">Fatura atual{cur ? ` · vence ${brDate(cur.dueDate).slice(0, 5)}` : ""}</dt><dd className="text-xl font-bold"><Money cents={cur?.remaining ?? 0} /></dd>{cur && <dd className="text-xs text-muted">{INV_STATUS[cur.status]} · fecha {brDate(cur.closingDate).slice(0, 5)}</dd>}</div>
+              <div className="rounded-md bg-surface-2 p-3"><dt className="text-xs text-muted">Próxima fatura{next ? ` · vence ${brDate(next.dueDate).slice(0, 5)}` : ""}</dt><dd className="text-xl font-bold"><Money cents={next?.remaining ?? 0} /></dd>{next && <dd className="text-xs text-muted">fecha {brDate(next.closingDate).slice(0, 5)}</dd>}</div>
+            </dl>
+            <h3 className="mb-1 mt-4 text-sm font-bold uppercase tracking-wide text-muted">Mês a mês</h3>
+            <ul className="divide-y divide-border text-sm">
+              {tl.map((i, k) => (
+                <li key={i.referenceMonth} className="py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{k === 0 ? "Atual" : k === 1 ? "Próxima" : "Mês"} · vence {brDate(i.dueDate).slice(0, 5)}/{i.dueDate.slice(0, 4)} <span className="text-xs text-muted">· {INV_STATUS[i.status]}</span></span>
+                    <Money cents={i.total} className="font-semibold" />
+                  </div>
+                  {(i.base > 0 || i.purchases > 0 || i.paid > 0) && <p className="text-xs text-muted">{i.base > 0 && <>informado <Money cents={i.base} /> · </>}lançado no app <Money cents={i.purchases} />{i.paid > 0 && <> · pago <Money cents={i.paid} /></>}</p>}
+                  {i.invoiceId && i.remaining > 0 && <details className="mt-1"><summary className="cursor-pointer font-semibold text-accent">Pagar</summary><div className="pt-2"><PayInvoiceForm invoiceId={i.invoiceId} remaining={i.remaining} today={iso} /></div></details>}
+                </li>
+              ))}
+            </ul>
+            <details className="mt-3"><summary className="cursor-pointer py-1 font-semibold text-accent">Informar o que cada fatura já tem (compras e parcelas)</summary>
+              <div className="pt-2"><InvoiceBasesForm key={tl.map((i) => `${i.referenceMonth}:${i.base}`).join("|")} cardId={c.id} rows={tl.map((i, k) => ({ referenceMonth: i.referenceMonth, base: i.base, label: `${k === 0 ? "Fatura atual" : k === 1 ? "Próxima fatura" : "Fatura"} · vence ${brDate(i.dueDate)}` }))} /></div>
+            </details>
+            <details className="mt-1"><summary className="cursor-pointer py-1 font-semibold text-accent">Ajustar limite e juros</summary><div className="pt-2"><CardEditForm id={c.id} limit={c.limit} rate={rate ? Number(rate.toString()) : null} /></div></details>
+          </section>
+        );
+      })}
+      {accounts.length > 0 && <details className={det}><summary className={sum}>Novo cartão</summary><div className="p-4 pt-0"><CardForm accounts={accounts} /></div></details>}
+      <p className="px-1 text-xs text-muted">Para lançar uma compra ou parcelamento, use o botão “Adicionar” e escolha o cartão. O valor entra na fatura do mês certo, aumenta o limite usado e a dívida do cartão no plano de quitação.</p>
     </>
   );
 }

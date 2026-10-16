@@ -71,9 +71,9 @@ export function TransferForm({ accounts, today }: { accounts: { id: string; name
 export function CardForm({ accounts }: { accounts: { id: string; name: string }[] }) {
   const { error, done, pending, run } = useAction();
   const [name, setName] = useState(""); const [issuer, setIssuer] = useState(""); const [limit, setLimit] = useState(0);
-  const [closing, setClosing] = useState(10); const [due, setDue] = useState(17); const [acc, setAcc] = useState(accounts[0]?.id ?? "");
+  const [closing, setClosing] = useState(10); const [due, setDue] = useState(17); const [acc, setAcc] = useState(accounts[0]?.id ?? ""); const [rate, setRate] = useState("");
   return (
-    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); run(() => A.saveCard({ name, issuer: issuer || undefined, limit, closingDay: closing, dueDay: due, payAccountId: acc, color: "#7C3AED" }), () => { setName(""); setLimit(0); }); }}>
+    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); run(() => A.saveCard({ name, issuer: issuer || undefined, limit, closingDay: closing, dueDay: due, payAccountId: acc, monthlyRate: rate ? Number(rate.replace(",", ".")) : undefined, color: "#7C3AED" }), () => { setName(""); setLimit(0); setRate(""); }); }}>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do cartão" aria-label="Nome do cartão" required className={field} />
       <input value={issuer} onChange={(e) => setIssuer(e.target.value)} placeholder="Instituição emissora" aria-label="Emissor" className={field} />
       <p className="-mb-1 text-sm text-muted">Limite total</p>
@@ -82,6 +82,7 @@ export function CardForm({ accounts }: { accounts: { id: string; name: string }[
         <label className="text-sm text-muted">Dia de fechamento<input type="number" min={1} max={31} value={closing} onChange={(e) => setClosing(Number(e.target.value))} className={`${field} mt-1`} /></label>
         <label className="text-sm text-muted">Dia de vencimento<input type="number" min={1} max={31} value={due} onChange={(e) => setDue(Number(e.target.value))} className={`${field} mt-1`} /></label>
       </div>
+      <input value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Juros do cartão % ao mês (opcional)" aria-label="Juros do cartão ao mês" inputMode="decimal" className={field} />
       <select value={acc} onChange={(e) => setAcc(e.target.value)} aria-label="Conta que paga a fatura" className={field}>{accounts.map((a) => <option key={a.id} value={a.id}>Paga com: {a.name}</option>)}</select>
       <Msg error={error} done={done} /><Submit pending={pending}>Criar cartão</Submit>
     </form>

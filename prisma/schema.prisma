@@ -36,6 +36,7 @@ enum TransactionType {
   DEBT_PAYMENT
   INVESTMENT_OUT // aporte: sai da conta para um investimento (não é despesa)
   INVESTMENT_IN // resgate: volta do investimento para a conta (não é receita)
+  CARD_BALANCE // saldo informado de uma fatura (compras/parcelas anteriores ao app): soma na fatura e no limite usado, mas não é gasto do mês
 }
 
 // PLANNED = previsto (não afeta saldo real). SETTLED = recebido/pago (afeta saldo).
@@ -283,6 +284,7 @@ model CreditCard {
   closingDay   Int
   dueDay       Int
   payAccountId String
+  monthlyRate  Decimal?  @db.Decimal(8, 4) // juros do rotativo/parcelamento da fatura, % ao mês (usado no plano de quitação)
   color        String    @default("#7C3AED")
   archivedAt   DateTime?
   createdAt    DateTime  @default(now())

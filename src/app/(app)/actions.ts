@@ -51,6 +51,8 @@ export async function saveTransfer(v: Parameters<typeof tr.createTransfer>[0]) {
 export async function saveAccount(v: Parameters<typeof acc.createAccount>[0]) { return run(async () => { await acc.createAccount(v); }); }
 export async function archiveAccount(id: string) { return run(async () => { await acc.archiveAccount(id); }); }
 export async function saveCard(v: Parameters<typeof cards.createCard>[0]) { return run(async () => { await cards.createCard(v); }); }
+export async function saveInvoiceBases(cardId: string, rows: { referenceMonth: string; amount: number }[]) { return run(() => cards.setInvoiceBases(cardId, rows)); }
+export async function editCard(id: string, v: Parameters<typeof cards.updateCard>[1]) { return run(async () => { await cards.updateCard(id, v); }); }
 export async function archiveCard(id: string) { return run(async () => { await cards.archiveCard(id); }); }
 export async function pay(v: Parameters<typeof cards.payInvoice>[0]) { return run(async () => { await cards.payInvoice(v); }); }
 export async function saveCategory(v: Parameters<typeof cat.createCategory>[0]) { return run(async () => { await cat.createCategory(v); }); }

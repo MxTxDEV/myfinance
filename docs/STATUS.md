@@ -30,3 +30,4 @@ Limitações: os horários aleatórios exigem um agendador externo chamando `/ap
 - Multiusuário + super admin + chave de lançamento automático: implementado e testado (integração e E2E). Open Finance direto: pendente de escolha de provedor.
 - Pluggy (Open Finance): implementado (widget, mapeamento, sincronização idempotente, webhook, reconciliação); testes com API simulada. Falta validar em sandbox com credenciais reais.
 - Mensagens: até 100/dia, personalizadas com os dados do usuário; Planejamento: plano de quitação (avalanche/bola de neve), orçamento ideal ("quanto posso gastar"), despesas fixas simples, tipos de dívida e edição.
+- Aba Cartões (Planejamento): por cartão, fatura atual/próxima/seguintes, limite usado, informar saldo e parcelas por fatura, juros; cartões entram sozinhos no plano de quitação.
