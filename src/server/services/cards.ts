@@ -159,7 +159,7 @@ export async function setInvoiceBases(cardId: string, rows: { referenceMonth: st
   return prisma.$transaction(async (tx) => {
     const card = await tx.creditCard.findFirst({ where: { id: cardId, archivedAt: null } });
     if (!card) throw new DomainError("Cartão não encontrado");
-    const valid = new Map((await cardTimeline(cardId, todayBR(), 18, tx)).map((c) => [c.referenceMonth, c]));
+    const valid = new Map((await cardTimeline(cardId, todayBR(), 60, tx)).map((c) => [c.referenceMonth, c]));
     let changed = 0;
     for (const r of parsed) {
       const cyc = valid.get(r.referenceMonth);

@@ -25,7 +25,7 @@ const ASSET: Record<string, string> = { VEHICLE: "Veículo", PROPERTY: "Imóvel"
 const det = "rounded-md border border-border bg-surface";
 const sum = "flex cursor-pointer items-center justify-between p-4 font-bold";
 
-export default async function Planejamento({ searchParams }: { searchParams: Promise<{ tab?: string; m?: string }> }) {
+export default async function Planejamento({ searchParams }: { searchParams: Promise<{ tab?: string; m?: string; n?: string }> }) {
   const sp = await searchParams;
   const tab = TABS.find(([k]) => k === sp.tab)?.[0] ?? "orcamentos";
   const today = todayBR();
@@ -46,7 +46,7 @@ export default async function Planejamento({ searchParams }: { searchParams: Pro
       {tab === "orcamentos" && <Budgets month={month} categories={categories.filter((c) => c.type === "EXPENSE")} />}
       {tab === "metas" && <Goals accounts={accounts} iso={iso} />}
       {tab === "dividas" && <Debts accounts={accounts} iso={iso} />}
-      {tab === "cartoes" && <Cards accounts={accounts} iso={iso} />}
+      {tab === "cartoes" && <Cards accounts={accounts} iso={iso} months={[12, 24, 36].includes(Number(sp.n)) ? Number(sp.n) : 12} />}
       {tab === "investimentos" && <Investments accounts={accounts} iso={iso} />}
       {tab === "patrimonio" && <NetWorth iso={iso} />}
       {tab === "compromissos" && <Commitments categories={categories} accounts={accounts} iso={iso} month={month} />}
@@ -245,9 +245,9 @@ async function Debts({ accounts, iso }: { accounts: { id: string; name: string }
 const INV_STATUS: Record<string, string> = { OPEN: "Aberta", CLOSED: "Fechada", PAID: "Paga", PARTIAL: "Parcial", OVERDUE: "Atrasada" };
 const brDate = (d: string) => d.split("-").reverse().join("/");
 
-async function Cards({ accounts, iso }: { accounts: { id: string; name: string }[]; iso: string }) {
+async function Cards({ accounts, iso, months }: { accounts: { id: string; name: string }[]; iso: string; months: number }) {
   const [cards, rows] = await Promise.all([cardOverview(), prisma.creditCard.findMany({ where: { archivedAt: null } })]);
-  const timelines = await Promise.all(cards.map((c) => cardTimeline(c.id, undefined, 6)));
+  const timelines = await Promise.all(cards.map((c) => cardTimeline(c.id, undefined, months)));
   const totalUsed = cards.reduce((s, c) => s + c.used, 0), totalLimit = cards.reduce((s, c) => s + c.limit, 0);
   const dueSoon = timelines.flatMap((t) => t.filter((i) => i.remaining > 0 && i.status !== "OPEN").map((i) => i.remaining)).reduce((a, b) => a + b, 0);
   return (
@@ -298,6 +298,12 @@ async function Cards({ accounts, iso }: { accounts: { id: string; name: string }
           </section>
         );
       })}
+      {cards.length > 0 && (
+        <nav aria-label="Quantos meses mostrar" className="flex items-center gap-2 text-sm">
+          <span className="text-muted">Meses de fatura:</span>
+          {[12, 24, 36].map((n) => <Link key={n} href={`/planejamento?tab=cartoes&n=${n}`} aria-current={months === n ? "page" : undefined} className={`rounded-full px-3 py-1.5 font-semibold ${months === n ? "bg-accent text-on-accent" : "bg-surface-2 text-muted"}`}>{n}</Link>)}
+        </nav>
+      )}
       {accounts.length > 0 && <details className={det}><summary className={sum}>Novo cartão</summary><div className="p-4 pt-0"><CardForm accounts={accounts} /></div></details>}
       <p className="px-1 text-xs text-muted">Para lançar uma compra ou parcelamento, use o botão “Adicionar” e escolha o cartão. O valor entra na fatura do mês certo, aumenta o limite usado e a dívida do cartão no plano de quitação.</p>
     </>

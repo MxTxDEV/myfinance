@@ -35,6 +35,14 @@ describe("saldo informado das faturas do cartão", () => {
     expect(c.available).toBe(500000 - 260000);
   });
 
+  it("dá para informar faturas de até 36 meses à frente", async () => {
+    const tl = await cardTimeline(s.card.id, TODAY, 36);
+    expect(tl).toHaveLength(36);
+    await setInvoiceBases(s.card.id, [{ referenceMonth: tl[35].referenceMonth, amount: 25000 }]);
+    expect((await cardTimeline(s.card.id, TODAY, 36))[35].total).toBe(25000);
+    expect((await cardOverview(TODAY))[0].used).toBe(25000);
+  });
+
   it("compra nova entra sozinha por cima: sobe a fatura, o usado e a dívida", async () => {
     const tl = await cardTimeline(s.card.id, TODAY, 3);
     await setInvoiceBases(s.card.id, [{ referenceMonth: tl[0].referenceMonth, amount: 100000 }]);
@@ -73,7 +81,7 @@ describe("saldo informado das faturas do cartão", () => {
   });
 
   it("recusa mês fora do período, valor inválido e cartão de outro usuário", async () => {
-    await expect(setInvoiceBases(s.card.id, [{ referenceMonth: "2030-01", amount: 1000 }])).rejects.toThrow(/fora do período/);
+    await expect(setInvoiceBases(s.card.id, [{ referenceMonth: "2040-01", amount: 1000 }])).rejects.toThrow(/fora do período/);
     await expect(setInvoiceBases(s.card.id, [{ referenceMonth: "2026-11", amount: -5 }])).rejects.toThrow(/inválidos/);
     await makeUser("b@example.com");
     await expect(setInvoiceBases(s.card.id, [{ referenceMonth: "2026-11", amount: 1000 }])).rejects.toThrow(/não encontrado/);
