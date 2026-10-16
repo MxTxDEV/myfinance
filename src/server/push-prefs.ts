@@ -7,13 +7,14 @@ export const pushPrefsSchema = z
   .object({
     enabled: z.boolean(), // liga/desliga todas as notificações push
     morning: z.boolean(), // mensagem fixa no início da janela (06:00)
-    perDay: z.number().int().min(0).max(10), // mensagens sorteadas ao longo do dia (além da manhã)
+    perDay: z.number().int().min(0).max(100), // mensagens sorteadas ao longo do dia (além da manhã)
     windowStart: hhmm,
     windowEnd: hhmm,
-    minGapMinutes: z.number().int().min(15).max(240),
+    minGapMinutes: z.number().int().min(5).max(240),
     spend: z.boolean(), // "pense antes de gastar"
     invest: z.boolean(), // "invista em vez de gastar"
     motivation: z.boolean(), // "não desista" (o que você perde se parar)
+    personal: z.boolean().default(true), // mensagens montadas com os SEUS números (compras pequenas acumuladas, ritmo do mês, dívidas)
     emojis: z.boolean(),
     alerts: z.object({
       bills: z.boolean(), invoices: z.boolean(), debts: z.boolean(), budget: z.boolean(), goals: z.boolean(), monthlySummary: z.boolean(), wins: z.boolean(),
@@ -25,7 +26,7 @@ export type PushPrefs = z.infer<typeof pushPrefsSchema>;
 
 export const DEFAULT_PREFS: PushPrefs = {
   enabled: true, morning: true, perDay: 4, windowStart: "06:00", windowEnd: "22:00", minGapMinutes: 60,
-  spend: true, invest: true, motivation: true, emojis: true,
+  spend: true, invest: true, motivation: true, personal: true, emojis: true,
   alerts: { bills: true, invoices: true, debts: true, budget: false, goals: false, monthlySummary: true, wins: true },
   stages: [3, 1, 0],
 };
@@ -40,5 +41,5 @@ export function readPrefs(raw: unknown): PushPrefs {
 
 /** Só o que muda os horários/mensagens sorteados: se mudar, os horários ainda não enviados são sorteados de novo. */
 export function prefsKey(p: PushPrefs): string {
-  return JSON.stringify([p.morning, p.perDay, p.windowStart, p.windowEnd, p.minGapMinutes, p.spend, p.invest, p.motivation]);
+  return JSON.stringify([p.morning, p.perDay, p.windowStart, p.windowEnd, p.minGapMinutes, p.spend, p.invest, p.motivation, p.personal]);
 }

@@ -183,13 +183,14 @@ test("menu de notificações: organizar horários, categorias e avisos (persiste
   await page.goto("/notificacoes");
   await expect(page.getByText("Organizar notificações")).toBeVisible();
   await expect(page.getByText("nunca chamou o servidor")).toBeVisible(); // agendador externo ainda não configurado neste ambiente
-  await page.getByLabel("Mensagens sorteadas por dia").selectOption("3");
+  await page.getByLabel("Mensagens sorteadas por dia").fill("3");
   await page.getByLabel("A partir de").fill("08:00");
-  await page.getByLabel("Até", { exact: true }).fill("20:00");
+  await page.getByLabel("Até", { exact: true }).fill("23:59");
   await expect(page.getByLabel("Incentivo (não desista)")).toBeChecked();
   await expect(page.getByLabel(/Comemorar minhas conquistas/)).toBeChecked();
   await page.getByLabel("Pense antes de gastar").uncheck();
   await page.getByLabel("Incentivo (não desista)").uncheck();
+  await page.getByLabel(/Personalizadas/).uncheck();
   await page.getByLabel(/Usar emojis/).uncheck();
   await page.getByLabel("Faturas do cartão").uncheck();
   await page.getByRole("button", { name: "Salvar", exact: true }).click();
@@ -207,7 +208,7 @@ test("menu de notificações: organizar horários, categorias e avisos (persiste
   const times = (await hoje.locator("li span.tabular-nums").allInnerTexts()).map((t) => t.replace(" ✓", ""));
   expect(times).toHaveLength(4);
   expect(times[0]).toBe("08:00");
-  for (const t of times) { expect(t >= "08:00" && t <= "20:00").toBe(true); }
+  for (const t of times) { expect(t >= "08:00" && t <= "23:59").toBe(true); }
   await expect(hoje.getByText("Pensar antes de gastar")).toHaveCount(0);
   await expect(hoje.getByText("Incentivo")).toHaveCount(0); // só "Investir" ficou ligado
 });
@@ -363,7 +364,7 @@ test("vincular o lançamento a uma dívida atualiza conta e saldo devedor juntos
 
 test("acessibilidade: sem violações sérias nas telas principais", async ({ page }) => {
   await login(page);
-  for (const url of ["/", "/movimentacoes", "/perfil", "/planejamento?tab=metas", "/planejamento?tab=investimentos", "/planejamento?tab=compromissos", "/notificacoes"]) {
+  for (const url of ["/", "/movimentacoes", "/perfil", "/planejamento?tab=metas", "/planejamento?tab=dividas", "/planejamento?tab=investimentos", "/planejamento?tab=compromissos", "/notificacoes"]) {
     await page.goto(url);
     await page.locator("main").waitFor();
     await page.waitForTimeout(800); // deixa as animações assentarem (a rede nunca fica ociosa: há sincronização em segundo plano)
@@ -372,4 +373,49 @@ test("acessibilidade: sem violações sérias nas telas principais", async ({ pa
     for (const v of bad) for (const n of v.nodes) console.log("A11Y", url, n.html.slice(0, 80), "|", (n.any[0]?.message ?? "").slice(0, 140));
     expect(bad.map((v) => `${url}: ${v.id} (${v.nodes.length})`), url).toEqual([]);
   }
+});
+
+test("plano de dívidas: renda, despesa fixa, cartão e carro geram o quanto posso gastar e a data de quitação", async ({ page }) => {
+  await login(page);
+  // precisa de uma conta para as despesas fixas
+  await page.goto("/perfil");
+  if (!(await page.getByText("Conta Plano").count())) {
+    await page.getByText("Nova conta").click();
+    await page.getByLabel("Nome da conta").fill("Conta Plano");
+    await page.getByRole("button", { name: /salvar|criar/i }).first().click();
+    await expect(page.getByText("Conta Plano").first()).toBeVisible();
+  }
+  await page.goto("/planejamento?tab=dividas");
+  await expect(page.getByText("Quanto posso gastar por mês")).toBeVisible();
+
+  // renda manual
+  await page.getByText("Ajustar renda, gasto e ordem").click();
+  await page.getByLabel("Renda mensal").fill("600000");
+  await page.getByRole("button", { name: "Salvar e recalcular" }).click();
+  await expect(page.getByText("Salvo ✓").first()).toBeVisible();
+
+  // despesa fixa
+  await page.locator("summary", { hasText: "Adicionar despesa fixa" }).click();
+  await page.getByLabel("Nome da despesa fixa").fill("Aluguel");
+  await page.getByLabel("Valor mensal").fill("150000");
+  await page.getByRole("button", { name: "Adicionar despesa fixa" }).click();
+  await expect(page.getByText("Salvo ✓").first()).toBeVisible();
+
+  // cartão e carro
+  for (const [name, kind, bal, rate, inst] of [["Cartão Inter", "CARTAO", "500000", "12", "80000"], ["Carro", "VEICULO", "3000000", "1,8", "120000"]]) {
+    const nova = page.locator("details", { has: page.locator("summary", { hasText: "Nova dívida" }) });
+    if (!(await nova.evaluate((e) => (e as HTMLDetailsElement).open))) await nova.locator("summary").click();
+    await nova.getByLabel("Tipo de dívida").selectOption(kind);
+    await nova.getByLabel("Nome da dívida").fill(name);
+    await nova.getByLabel("Valor original", { exact: true }).fill(bal);
+    await nova.getByLabel("Juros ao mês").fill(rate);
+    await nova.getByLabel("Valor da parcela", { exact: false }).fill(inst);
+    await nova.getByRole("button", { name: "Cadastrar dívida" }).click();
+    await expect(page.getByText(name).first()).toBeVisible();
+  }
+  await expect(page.getByText("Plano para quitar tudo")).toBeVisible();
+  await expect(page.getByText(/Livre em \d{2}\/\d{4}/)).toBeVisible();
+  await expect(page.getByText(/1º Cartão Inter/)).toBeVisible(); // maior juro primeiro
+  await expect(page.getByText("Despesas fixas (1)")).toBeVisible();
+  await expect(page.getByText("Extra para quitar dívidas")).toBeVisible();
 });

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { prisma } from "@/server/db";
+import { currentProfile, prisma } from "@/server/db";
+import { financialPlan } from "@/server/services/plan";
 import { accountBalances } from "@/server/services/accounts";
 import { budgetOverview, debtsOverview, goalsOverview, netWorthOverview } from "@/server/services/planning";
 import { fixedOverview, generateRecurring } from "@/server/services/recurring";
@@ -12,8 +13,8 @@ import { Money } from "@/components/privacy";
 import { Card, Empty, MonthNav, Progress } from "@/components/ui";
 import { TxList } from "@/components/tx-list";
 import { SeriesChart } from "@/components/series-chart";
-import { pauseRecurring, removeAsset, removeBudget, removeGoal, removeInvestment, settle, stopRecurring } from "../actions";
-import { AssetForm, BudgetForm, DebtForm, DebtPayForm, GoalEntryForm, GoalForm, INV_LABEL, InvestmentForm, InvestMoveForm, InvestValueForm, RecurringEditForm, RecurringForm, RowBtn } from "./forms";
+import { pauseRecurring, removeAsset, removeDebt, removeBudget, removeGoal, removeInvestment, settle, stopRecurring } from "../actions";
+import { AssetForm, BudgetForm, DebtEditForm, DebtForm, DebtPayForm, FixedExpenseForm, PlanPrefsForm, GoalEntryForm, GoalForm, INV_LABEL, InvestmentForm, InvestMoveForm, InvestValueForm, RecurringEditForm, RecurringForm, RowBtn } from "./forms";
 
 const TABS = [["orcamentos", "Orçamentos"], ["metas", "Metas"], ["dividas", "Dívidas"], ["investimentos", "Investimentos"], ["patrimonio", "Patrimônio"], ["compromissos", "Contas fixas"], ["relatorios", "Relatórios"]] as const;
 const REC: Record<string, string> = { WEEKLY: "Semanal", BIWEEKLY: "Quinzenal", MONTHLY: "Mensal", YEARLY: "Anual", CUSTOM: "Personalizado" };
@@ -80,9 +81,24 @@ async function Budgets({ month, categories }: { month: string; categories: { id:
 }
 
 async function Goals({ accounts, iso }: { accounts: { id: string; name: string }[]; iso: string }) {
-  const g = await goalsOverview();
+  const [g, profile] = await Promise.all([goalsOverview(), currentProfile()]);
+  const fp = await financialPlan(profile?.planPrefs);
+  const sg = fp.suggestion;
+  // Para metas: a reserva do mês + o extra, se não houver dívida (com dívida, o extra vai para quitá-la primeiro).
+  const saveMonthly = sg.status === "OK" ? sg.reserve + (fp.totalDebt > 0 ? 0 : sg.extraForDebts) : 0;
   return (
     <>
+      {fp.income > 0 && (
+        <section className="rounded-lg border border-border bg-surface p-5" aria-label="Quanto posso guardar">
+          <p className="text-sm font-medium text-muted">Quanto posso guardar por mês</p>
+          {saveMonthly > 0 ? (
+            <>
+              <p className="mt-1 text-3xl font-bold"><Money cents={saveMonthly} /></p>
+              <p className="text-sm text-muted">{fp.totalDebt > 0 ? "É a reserva do plano; o extra do mês está indo para quitar as dívidas primeiro (aba Dívidas)." : "Reserva + o que sobra depois das contas fixas e do gasto livre."}</p>
+            </>
+          ) : <p className="mt-1 text-sm">Hoje não sobra para guardar depois das contas fixas e parcelas. Veja o plano na aba Dívidas.</p>}
+        </section>
+      )}
       {g.items.length === 0 ? <Card><Empty title="Nenhuma meta ainda" hint="Crie uma meta, como uma reserva de emergência, e acompanhe o progresso." /></Card> : (
         <ul className="flex flex-col gap-3">
           {g.items.map((x) => (
@@ -91,6 +107,7 @@ async function Goals({ accounts, iso }: { accounts: { id: string; name: string }
               <div className="my-2"><Progress value={x.percent} label={`${x.name}: ${x.percent}%`} tone={x.percent >= 100 ? "income" : "accent"} /></div>
               <div className="flex justify-between text-sm"><span><Money cents={x.saved} className="font-semibold" /> de <Money cents={x.target} /></span><span className="font-semibold">{x.percent}%</span></div>
               {x.monthlyNeeded !== null && x.remaining > 0 && <p className="mt-1 text-sm text-muted">Precisa guardar <Money cents={x.monthlyNeeded} className="font-semibold text-text" />/mês até {x.targetDate!.split("-").reverse().join("/")}.</p>}
+              {saveMonthly > 0 && x.remaining > 0 && <p className="mt-1 text-sm text-muted">Guardando <Money cents={saveMonthly} className="font-semibold text-text" />/mês, você chega lá em cerca de {Math.ceil(x.remaining / saveMonthly)} {Math.ceil(x.remaining / saveMonthly) === 1 ? "mês" : "meses"}.</p>}
               {x.feasible === false && (
                 <p role="note" className="mt-2 rounded-md bg-expense-bg p-3 text-sm">
                   Com seu excedente atual ({formatBRL(Math.max(0, g.monthlySurplus))}/mês) essa meta não fecha no prazo.{" "}
@@ -107,26 +124,107 @@ async function Goals({ accounts, iso }: { accounts: { id: string; name: string }
   );
 }
 
+const KIND_LABEL: Record<string, string> = { CARTAO: "Cartão", VEICULO: "Carro/moto", FINANCIAMENTO: "Financiamento", EMPRESTIMO: "Empréstimo", OUTRO: "Dívida" };
+const monthYear = (d: string) => `${d.slice(5, 7)}/${d.slice(0, 4)}`;
+const span = (m: number | null) => (m === null ? "não quita nesse ritmo" : m < 12 ? `${m} ${m === 1 ? "mês" : "meses"}` : `${Math.floor(m / 12)} ${Math.floor(m / 12) === 1 ? "ano" : "anos"}${m % 12 ? ` e ${m % 12} ${m % 12 === 1 ? "mês" : "meses"}` : ""}`);
+
 async function Debts({ accounts, iso }: { accounts: { id: string; name: string }[]; iso: string }) {
-  const debts = await debtsOverview(10000);
+  const profile = await currentProfile();
+  const [debts, p, fixed, cards] = await Promise.all([
+    debtsOverview(), financialPlan(profile?.planPrefs), fixedOverview(), prisma.creditCard.findMany({ where: { archivedAt: null } }),
+  ]);
+  const sg = p.suggestion;
+  const fixedExpenses = fixed.items.filter((i) => i.type === "EXPENSE" && i.active);
   return (
     <>
-      {debts.length === 0 ? <Card><Empty title="Nenhuma dívida cadastrada" hint="Cadastre financiamentos e empréstimos para acompanhar o saldo devedor." /></Card> : (
+      <section className="rounded-lg border border-border bg-surface p-5" aria-label="Quanto posso gastar por mês">
+        <p className="text-sm font-medium text-muted">Quanto posso gastar por mês</p>
+        {p.income <= 0 ? (
+          <p className="mt-2 text-sm">Informe a sua renda mensal abaixo para eu calcular o seu orçamento ideal.</p>
+        ) : sg.status === "DEFICIT" ? (
+          <>
+            <p className="mt-1 text-2xl font-bold text-expense">Faltam <Money cents={sg.shortfall} /> por mês</p>
+            <p className="mt-1 text-sm">Só as contas fixas (<Money cents={sg.fixed} />) e as parcelas das dívidas (<Money cents={sg.debtMin} />) já passam da renda (<Money cents={sg.income} />). Antes de gastar qualquer coisa, é preciso cortar fixos, renegociar parcelas ou aumentar a renda.</p>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-4xl font-bold"><Money cents={sg.variableCap} /></p>
+            <p className="text-sm text-muted">por mês fora as contas fixas e as dívidas — cerca de <Money cents={sg.perDay} className="font-semibold text-text" /> por dia.{p.avgVariable > 0 && <> Nos últimos 3 meses você gastou em média <Money cents={p.avgVariable} className="font-semibold text-text" />.</>}</p>
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <dt className="text-muted">Renda{p.incomeIsManual ? "" : " (média)"}</dt><dd className="text-right font-semibold text-income"><Money cents={sg.income} /></dd>
+              <dt className="text-muted">Despesas fixas</dt><dd className="text-right font-semibold"><Money cents={sg.fixed} /></dd>
+              <dt className="text-muted">Parcelas das dívidas</dt><dd className="text-right font-semibold"><Money cents={sg.debtMin} /></dd>
+              <dt className="text-muted">Reserva ({p.totalDebt > 0 ? "5" : "10"}%)</dt><dd className="text-right font-semibold"><Money cents={sg.reserve} /></dd>
+              <dt className="text-muted">Gasto livre</dt><dd className="text-right font-semibold"><Money cents={sg.variableCap} /></dd>
+              <dt className="text-muted">{p.totalDebt > 0 ? "Extra para quitar dívidas" : "Sobra para guardar"}</dt><dd className="text-right font-semibold text-income"><Money cents={sg.extraForDebts} /></dd>
+            </dl>
+            {sg.status === "TIGHT" && <p className="mt-2 text-sm text-expense">Aperto: depois de fixos e parcelas quase nada sobra para reserva ou extra. Cada real gasto fora do plano vira dívida.</p>}
+          </>
+        )}
+      </section>
+
+      {debts.length > 0 && (
+        <section className="rounded-lg border border-border bg-surface p-5" aria-label="Plano de quitação">
+          <p className="text-sm font-medium text-muted">Plano para quitar tudo</p>
+          {p.result.months === null ? (
+            <p className="mt-1 text-lg font-bold text-expense">Nesse ritmo as dívidas não zeram</p>
+          ) : (
+            <p className="mt-1 text-3xl font-bold">Livre em {monthYear(p.result.date!)}</p>
+          )}
+          <p className="text-sm text-muted">{p.result.months !== null ? `Daqui a ${span(p.result.months)}, ` : ""}pagando <Money cents={p.debtMin + sg.extraForDebts} className="font-semibold text-text" /> por mês no total (<Money cents={p.debtMin} /> de parcelas + <Money cents={sg.extraForDebts} /> de extra). Juros no caminho: <Money cents={p.result.totalInterest} className="font-semibold text-expense" />.</p>
+          {p.saved && p.saved.months > 0 && <p className="mt-1 text-sm text-income">Comparado a pagar só as parcelas: {p.saved.months} {p.saved.months === 1 ? "mês" : "meses"} a menos e <Money cents={p.saved.interest} /> de juros economizados.</p>}
+          {p.baseline.months === null && <p className="mt-1 text-sm text-muted">Pagando só as parcelas, ao menos uma dívida nunca zera (a parcela não cobre os juros).</p>}
+          {p.result.order.length > 0 && (
+            <ol className="mt-3 flex flex-col gap-1 text-sm">
+              {p.result.order.map((o, i) => <li key={o.id}><span className="font-semibold">{i + 1}º {o.name}</span> — quitada em {monthYear(o.date)} <span className="text-muted">({span(o.month)})</span></li>)}
+            </ol>
+          )}
+          <p className="mt-3 text-xs text-muted">Ordem usada: {p.prefs.strategy === "AVALANCHE" ? "juros mais altos primeiro" : "menor saldo primeiro"}. A outra ordem levaria {span(p.prefs.strategy === "AVALANCHE" ? p.compare.SNOWBALL.months : p.compare.AVALANCHE.months)} e <Money cents={p.prefs.strategy === "AVALANCHE" ? p.compare.SNOWBALL.interest : p.compare.AVALANCHE.interest} /> de juros. Quando uma dívida zera, a parcela dela vai para a próxima.</p>
+        </section>
+      )}
+
+      <details className={det}><summary className={sum}>Ajustar renda, gasto e ordem</summary><div className="p-4 pt-0"><PlanPrefsForm income={p.prefs.income} detected={p.detectedIncome} variable={p.prefs.variable} strategy={p.prefs.strategy} /></div></details>
+
+      <h2 className="px-1 font-bold">Minhas dívidas</h2>
+      {debts.length === 0 ? <Card><Empty title="Nenhuma dívida cadastrada" hint="Cadastre o cartão, o carro, financiamentos e empréstimos para eu montar o plano de quitação." /></Card> : (
         <ul className="flex flex-col gap-3">
-          {debts.map((x) => (
-            <li key={x.id} className="rounded-md border border-border bg-surface p-4">
-              <p className="font-bold">{x.name} <span className="text-sm font-normal text-muted">{x.creditor}</span></p>
-              <p className="mt-1 text-2xl font-bold"><Money cents={x.balance} /></p>
-              <div className="my-2"><Progress value={x.original ? (x.paid / x.original) * 100 : 0} label={`${x.name}: ${x.original ? Math.round((x.paid / x.original) * 100) : 0}% quitado`} tone="income" /></div>
-              <p className="text-sm text-muted">Original <Money cents={x.original} /> · pago <Money cents={x.paid} />{x.nextDueDate && ` · próximo vencimento ${x.nextDueDate.split("-").reverse().join("/")}`}</p>
-              {x.payoffMonths !== null && x.payoffDate && <p className="mt-1 text-sm">Quitação estimada em {x.payoffMonths} meses ({x.payoffDate.split("-").reverse().join("/")}).</p>}
-              {x.simulation?.monthsSaved ? <p className="text-sm text-income">Pagando {formatBRL(10000)} a mais por mês, você economiza {x.simulation.monthsSaved} meses e {formatBRL(x.simulation.interestSaved)} de juros.</p> : null}
-              {x.balance > 0 && accounts.length > 0 && <details className="mt-2"><summary className="cursor-pointer py-1 font-semibold text-accent">Registrar pagamento</summary><div className="pt-2"><DebtPayForm debtId={x.id} balance={x.balance} accounts={accounts} today={iso} /></div></details>}
-            </li>
-          ))}
+          {debts.map((x) => {
+            const pl = p.debts.find((d) => d.id === x.id);
+            return (
+              <li key={x.id} className="rounded-md border border-border bg-surface p-4">
+                <p className="font-bold">{x.name} <span className="text-sm font-normal text-muted">{KIND_LABEL[x.kind] ?? "Dívida"}{x.creditor ? ` · ${x.creditor}` : ""}</span></p>
+                <p className="mt-1 text-2xl font-bold"><Money cents={x.balance} /></p>
+                <div className="my-2"><Progress value={x.original ? (x.paid / x.original) * 100 : 0} label={`${x.name}: ${x.original ? Math.max(0, Math.round((x.paid / x.original) * 100)) : 0}% quitado`} tone="income" /></div>
+                <p className="text-sm text-muted">Original <Money cents={x.original} /> · pago <Money cents={Math.max(0, x.paid)} />{x.installmentAmount ? <> · parcela <Money cents={x.installmentAmount} /></> : ""}{x.monthlyRate ? ` · ${String(x.monthlyRate).replace(".", ",")}% ao mês` : ""}{x.nextDueDate && ` · vence ${x.nextDueDate.split("-").reverse().join("/")}`}</p>
+                {pl?.payoffDate && <p className="mt-1 text-sm">No plano, quitada em {monthYear(pl.payoffDate)}.</p>}
+                {!x.installmentAmount && <p className="mt-1 text-sm text-muted">Sem parcela informada: ela só recebe o que sobra do extra. Informe a parcela (ou o mínimo do cartão) para o plano ficar fiel.</p>}
+                <div className="mt-1 flex flex-wrap gap-x-4">
+                  <details><summary className="cursor-pointer py-1 font-semibold text-accent">Atualizar saldo, juros e parcela</summary><div className="pt-2"><DebtEditForm id={x.id} balance={x.balance} rate={x.monthlyRate} installment={x.installmentAmount} kind={x.kind} /></div></details>
+                  {x.balance > 0 && accounts.length > 0 && <details><summary className="cursor-pointer py-1 font-semibold text-accent">Registrar pagamento</summary><div className="pt-2"><DebtPayForm debtId={x.id} balance={x.balance} accounts={accounts} today={iso} /></div></details>}
+                  <RowBtn label="Remover" danger confirm="Remover esta dívida do plano? O histórico de pagamentos é mantido." onRun={removeDebt.bind(null, x.id)} />
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
-      <details className={det}><summary className={sum}>Nova dívida</summary><div className="p-4 pt-0"><DebtForm /></div></details>
+      <details className={det}><summary className={sum}>Nova dívida (cartão, carro, empréstimo…)</summary><div className="p-4 pt-0"><DebtForm /></div></details>
+
+      <Card title={`Despesas fixas (${fixedExpenses.length})`}>
+        {fixedExpenses.length === 0 ? <p className="text-sm text-muted">Nenhuma ainda. Cadastre aluguel, internet, escola, plano de saúde… elas entram no cálculo do quanto você pode gastar e nos avisos de vencimento.</p> : (
+          <ul className="divide-y divide-border">
+            {fixedExpenses.map((f) => (
+              <li key={f.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                <span className="min-w-0 truncate">{f.description} <span className="text-muted">· {f.category}</span></span>
+                <Money cents={f.monthlyEquivalent} className="shrink-0 font-semibold" />
+              </li>
+            ))}
+            <li className="flex items-center justify-between pt-2 text-sm font-bold"><span>Total por mês</span><Money cents={p.fixedMonthly} /></li>
+          </ul>
+        )}
+        <details className="mt-3"><summary className="cursor-pointer py-1 font-semibold text-accent">Adicionar despesa fixa</summary><div className="pt-2"><FixedExpenseForm accounts={accounts} cards={cards.map((c) => ({ id: c.id, name: c.name }))} /></div></details>
+        <p className="mt-2 text-xs text-muted">Para editar ou encerrar uma despesa, use a aba “Contas fixas”.</p>
+      </Card>
     </>
   );
 }

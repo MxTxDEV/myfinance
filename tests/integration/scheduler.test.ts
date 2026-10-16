@@ -39,11 +39,11 @@ describe("horários do dia", () => {
     expect(mins[0]).toBe(6 * 60); // manhã exatamente às 06:00
     for (const m of mins) { expect(m).toBeGreaterThanOrEqual(6 * 60); expect(m).toBeLessThanOrEqual(22 * 60); }
     for (let i = 2; i < mins.length; i++) expect(mins[i] - mins[i - 1]).toBeGreaterThanOrEqual(60);
-    expect(a.slice(1).map((x) => x.kind)).toEqual(["SPEND", "INVEST", "MOTIVATION", "SPEND"]); // alterna as 3 categorias
+    expect(a.slice(1).map((x) => x.kind)).toEqual(["SPEND", "INVEST", "MOTIVATION", "PERSONAL"]); // alterna as 4 categorias
     expect(new Set(a.map((x) => x.message)).size).toBe(5);
   });
   it("respeita as categorias escolhidas e a janela personalizada", async () => {
-    const a = await ensureSchedule(T("2026-10-16", "07:00"), prefs({ morning: false, invest: false, motivation: false, perDay: 3, windowStart: "09:00", windowEnd: "12:00", minGapMinutes: 30 }));
+    const a = await ensureSchedule(T("2026-10-16", "07:00"), prefs({ morning: false, invest: false, motivation: false, personal: false, perDay: 3, windowStart: "09:00", windowEnd: "12:00", minGapMinutes: 30 }));
     expect(a.every((x) => x.kind === "SPEND")).toBe(true);
     for (const x of a) { const m = localParts(x.at).minutes; expect(m).toBeGreaterThanOrEqual(540); expect(m).toBeLessThanOrEqual(720); }
   });
@@ -187,5 +187,37 @@ describe("agendador (tick)", () => {
     expect(r).toMatchObject({ sent: 0, push: "desligado" });
     expect(sent).toHaveLength(0);
     expect(readPrefs((await prisma.profile.findFirstOrThrow()).notifyPrefs).enabled).toBe(false);
+  });
+});
+
+describe("mensagens personalizadas e muitas por dia", () => {
+  it("PERSONAL vira texto com os números do usuário no envio", async () => {
+    const day = "2026-10-16";
+    for (const [amount, i] of [[1000, 0], [2000, 1], [1500, 2]] as const) {
+      await createTransaction({ type: "EXPENSE", amount, description: `Lanche ${i}`, date: day, categoryId: s.food.id, status: "SETTLED", installments: 1, accountId: s.bank.id });
+    }
+    const p = prefs({ morning: false, spend: false, invest: false, motivation: false, personal: true, perDay: 1, windowStart: "10:00", windowEnd: "10:30" });
+    const slots = await ensureSchedule(T(day, "09:00"), p);
+    expect(slots).toHaveLength(1); expect(slots[0].kind).toBe("PERSONAL");
+    await sendDueSlots(T(day, "11:00"), p);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].body).toMatch(/R\$/); // número real do usuário, não a frase genérica de reserva
+    expect(sent[0].title).toContain("Pra você");
+    const saved = await prisma.pushSlot.findFirstOrThrow({ where: { day } });
+    expect(saved.message).toBe(sent[0].body.replace(/^\p{Extended_Pictographic}️?\s*/u, "").length ? saved.message : "");
+  });
+  it("sem dados, a personalizada cai numa frase comum (nunca fica vazia)", async () => {
+    const p = prefs({ morning: false, spend: false, invest: false, motivation: false, personal: true, perDay: 1, windowStart: "10:00", windowEnd: "10:30" });
+    await ensureSchedule(T("2026-10-17", "09:00"), p);
+    await sendDueSlots(T("2026-10-17", "11:00"), p);
+    expect(sent).toHaveLength(1); expect(sent[0].body.length).toBeGreaterThan(20);
+  });
+  it("aceita 100 mensagens por dia com intervalo curto, dentro da janela", async () => {
+    const p = prefs({ perDay: 100, minGapMinutes: 5, windowStart: "06:00", windowEnd: "22:00" });
+    const a = await ensureSchedule(T("2026-10-18", "05:00"), p);
+    expect(a.filter((x) => x.kind !== "MORNING").length).toBeGreaterThanOrEqual(90);
+    const mins = a.map((x) => localParts(x.at).minutes).sort((x, y) => x - y);
+    for (let i = 1; i < mins.length; i++) expect(mins[i] - mins[i - 1]).toBeGreaterThanOrEqual(5);
+    expect(new Set(a.map((x) => x.message)).size).toBeGreaterThan(80); // quase todas diferentes
   });
 });

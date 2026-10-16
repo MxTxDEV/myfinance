@@ -54,11 +54,14 @@ export function GoalEntryForm({ goalId, today }: { goalId: string; today: string
 export function DebtForm() {
   const { error, done, pending, run } = useAction();
   const [name, setName] = useState(""); const [creditor, setCreditor] = useState(""); const [orig, setOrig] = useState(0); const [bal, setBal] = useState(0);
-  const [rate, setRate] = useState(""); const [inst, setInst] = useState(0); const [n, setN] = useState(""); const [next, setNext] = useState("");
+  const [kind, setKind] = useState("OUTRO"); const [rate, setRate] = useState(""); const [inst, setInst] = useState(0); const [n, setN] = useState(""); const [next, setNext] = useState("");
   return (
     <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault();
       run(() => A.saveDebt({ name, creditor: creditor || undefined, originalAmount: orig, balance: bal || orig, monthlyRate: rate ? Number(rate.replace(",", ".")) : undefined,
-        installmentAmount: inst || undefined, installmentsTotal: n ? Number(n) : undefined, nextDueDate: next || undefined }), () => { setName(""); setOrig(0); setBal(0); }); }}>
+        installmentAmount: inst || undefined, installmentsTotal: n ? Number(n) : undefined, nextDueDate: next || undefined, kind: kind as "OUTRO" }), () => { setName(""); setOrig(0); setBal(0); setInst(0); setRate(""); }); }}>
+      <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Tipo de dívida" className={field}>
+        <option value="CARTAO">Cartão de crédito</option><option value="VEICULO">Carro / moto</option><option value="FINANCIAMENTO">Financiamento</option><option value="EMPRESTIMO">Empréstimo</option><option value="OUTRO">Outra dívida</option>
+      </select>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da dívida" aria-label="Nome da dívida" required className={field} />
       <input value={creditor} onChange={(e) => setCreditor(e.target.value)} placeholder="Credor" aria-label="Credor" className={field} />
       <p className="-mb-1 text-sm text-muted">Valor original</p><MoneyInput cents={orig} onChange={setOrig} label="Valor original" className="!text-xl" />
@@ -67,7 +70,7 @@ export function DebtForm() {
         <input value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Juros % ao mês" aria-label="Juros ao mês" inputMode="decimal" className={field} />
         <input value={n} onChange={(e) => setN(e.target.value)} placeholder="Nº de parcelas" aria-label="Número de parcelas" inputMode="numeric" className={field} />
       </div>
-      <p className="-mb-1 text-sm text-muted">Valor da parcela</p><MoneyInput cents={inst} onChange={setInst} label="Valor da parcela" className="!text-xl" />
+      <p className="-mb-1 text-sm text-muted">Parcela mensal (ou pagamento mínimo do cartão)</p><MoneyInput cents={inst} onChange={setInst} label="Valor da parcela" className="!text-xl" />
       <label className="text-sm text-muted">Próximo vencimento<input type="date" value={next} onChange={(e) => setNext(e.target.value)} className={`${field} mt-1`} /></label>
       <Msg error={error} done={done} /><Submit pending={pending}>Cadastrar dívida</Submit>
     </form>
@@ -210,6 +213,69 @@ export function RecurringEditForm({ id, description, amount, categories, categor
       <label className="text-sm text-muted">Termina em (opcional)<input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className={`${field} mt-1`} /></label>
       <p className="text-xs text-muted">A mudança vale para as próximas contas ainda não pagas. O que já foi pago não muda.</p>
       <Msg error={error} done={done} /><Submit pending={pending}>Salvar alterações</Submit>
+    </form>
+  );
+}
+
+const KINDS: [string, string][] = [["CARTAO", "Cartão de crédito"], ["VEICULO", "Carro / moto"], ["FINANCIAMENTO", "Financiamento"], ["EMPRESTIMO", "Empréstimo"], ["OUTRO", "Outra dívida"]];
+
+
+/** Atualiza o que muda com o tempo: saldo, juros e parcela. */
+export function DebtEditForm({ id, balance, rate, installment, kind }: { id: string; balance: number; rate: number | null; installment: number | null; kind: string }) {
+  const { error, done, pending, run } = useAction();
+  const [bal, setBal] = useState(balance); const [r, setR] = useState(rate ? String(rate).replace(".", ",") : ""); const [inst, setInst] = useState(installment ?? 0); const [k, setK] = useState(kind);
+  return (
+    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); run(() => A.editDebt(id, { balance: bal, monthlyRate: r ? Number(r.replace(",", ".")) : null, installmentAmount: inst || null, kind: k as "OUTRO" })); }}>
+      <select value={k} onChange={(e) => setK(e.target.value)} aria-label="Tipo de dívida" className={field}>{KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      <p className="-mb-1 text-sm text-muted">Saldo devedor hoje</p><MoneyInput cents={bal} onChange={setBal} label="Saldo devedor" className="!text-xl" />
+      <input value={r} onChange={(e) => setR(e.target.value)} placeholder="Juros % ao mês" aria-label="Juros ao mês" inputMode="decimal" className={field} />
+      <p className="-mb-1 text-sm text-muted">Parcela mensal (ou mínimo)</p><MoneyInput cents={inst} onChange={setInst} label="Parcela mensal" className="!text-xl" />
+      <Msg error={error} done={done} /><Submit pending={pending}>Salvar</Submit>
+    </form>
+  );
+}
+
+/** Despesa fixa em 4 campos: nome, valor, dia do vencimento e de onde sai. */
+export function FixedExpenseForm({ accounts, cards }: { accounts: Opt[]; cards: Opt[] }) {
+  const { error, done, pending, run } = useAction();
+  const [desc, setDesc] = useState(""); const [amount, setAmount] = useState(0); const [day, setDay] = useState("5");
+  const [target, setTarget] = useState(accounts[0] ? `acc:${accounts[0].id}` : cards[0] ? `card:${cards[0].id}` : "");
+  return (
+    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); const [k, id] = target.split(":");
+      run(() => A.saveFixedExpense({ description: desc, amount, day: Number(day), ...(k === "card" ? { cardId: id } : { accountId: id }) }), () => { setDesc(""); setAmount(0); }); }}>
+      <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Ex.: Aluguel, Internet, Escola" aria-label="Nome da despesa fixa" required className={field} />
+      <MoneyInput cents={amount} onChange={setAmount} label="Valor mensal" className="!text-xl" />
+      <div className="grid grid-cols-2 gap-3">
+        <label className="text-sm text-muted">Dia do vencimento<input value={day} onChange={(e) => setDay(e.target.value)} inputMode="numeric" aria-label="Dia do vencimento" className={`${field} mt-1`} /></label>
+        <label className="text-sm text-muted">Sai de
+          <select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Conta ou cartão" className={`${field} mt-1`}>
+            <optgroup label="Contas">{accounts.map((a) => <option key={a.id} value={`acc:${a.id}`}>{a.name}</option>)}</optgroup>
+            {cards.length > 0 && <optgroup label="Cartões">{cards.map((c) => <option key={c.id} value={`card:${c.id}`}>{c.name}</option>)}</optgroup>}
+          </select>
+        </label>
+      </div>
+      <Msg error={error} done={done} /><Submit pending={pending || !target}>Adicionar despesa fixa</Submit>
+    </form>
+  );
+}
+
+/** Renda do mês, quanto você quer gastar por mês e a estratégia de quitação. */
+export function PlanPrefsForm({ income, detected, variable, strategy }: { income: number | null; detected: number; variable: number | null; strategy: "AVALANCHE" | "SNOWBALL" }) {
+  const { error, done, pending, run } = useAction();
+  const [inc, setInc] = useState(income ?? 0); const [vr, setVr] = useState(variable ?? 0); const [st, setSt] = useState(strategy);
+  return (
+    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); run(() => A.savePlan({ income: inc || null, variable: vr || null, strategy: st })); }}>
+      <p className="-mb-1 text-sm text-muted">Sua renda mensal (vazio = usar a média dos últimos 3 meses{detected > 0 ? `: ${(detected / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}` : ""})</p>
+      <MoneyInput cents={inc} onChange={setInc} label="Renda mensal" className="!text-xl" />
+      <p className="-mb-1 text-sm text-muted">Quanto você quer gastar por mês fora as contas fixas (vazio = sugestão automática)</p>
+      <MoneyInput cents={vr} onChange={setVr} label="Gasto mensal desejado" className="!text-xl" />
+      <label className="text-sm text-muted">Ordem de quitação
+        <select value={st} onChange={(e) => setSt(e.target.value as "AVALANCHE")} className={`${field} mt-1`}>
+          <option value="AVALANCHE">Juros mais altos primeiro (paga menos juros)</option>
+          <option value="SNOWBALL">Menor saldo primeiro (vitórias rápidas)</option>
+        </select>
+      </label>
+      <Msg error={error} done={done} /><Submit pending={pending}>Salvar e recalcular</Submit>
     </form>
   );
 }

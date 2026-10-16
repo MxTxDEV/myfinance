@@ -1,7 +1,7 @@
 import { prisma, type Db } from "../db";
 import { cents, dateIn, dateOut, dec } from "../convert";
 import { DomainError } from "../errors";
-import { assetInput, budgetInput, debtInput, debtPaymentInput, goalEntryInput, goalInput } from "../schemas";
+import { assetInput, budgetInput, debtInput, debtUpdateInput, debtPaymentInput, goalEntryInput, goalInput } from "../schemas";
 import type { z } from "zod";
 import { accountBalances } from "./accounts";
 import { cardOverview } from "./cards";
@@ -109,11 +109,28 @@ export async function createDebt(raw: z.input<typeof debtInput>) {
   return prisma.debt.create({
     data: {
       name: v.name, creditor: v.creditor, originalAmount: dec(v.originalAmount), balance: dec(v.balance),
-      monthlyRate: v.monthlyRate?.toString(), installmentAmount: v.installmentAmount ? dec(v.installmentAmount) : null,
+      kind: v.kind ?? "OUTRO", monthlyRate: v.monthlyRate?.toString(), installmentAmount: v.installmentAmount ? dec(v.installmentAmount) : null,
       installmentsTotal: v.installmentsTotal, nextDueDate: v.nextDueDate ? dateIn(v.nextDueDate) : null,
     },
   });
 }
+
+/** Ajusta saldo, taxa, parcela ou tipo de uma dívida (ex.: o saldo do cartão mudou). */
+export async function updateDebt(id: string, raw: z.input<typeof debtUpdateInput>) {
+  const v = debtUpdateInput.parse(raw);
+  const d = await prisma.debt.findFirst({ where: { id, archivedAt: null } });
+  if (!d) throw new DomainError("Dívida não encontrada");
+  return prisma.debt.update({
+    where: { id },
+    data: {
+      ...(v.name !== undefined ? { name: v.name } : {}), ...(v.kind !== undefined ? { kind: v.kind } : {}),
+      ...(v.balance !== undefined ? { balance: dec(v.balance) } : {}),
+      ...(v.monthlyRate !== undefined ? { monthlyRate: v.monthlyRate === null ? null : v.monthlyRate.toString() } : {}),
+      ...(v.installmentAmount !== undefined ? { installmentAmount: v.installmentAmount === null ? null : dec(v.installmentAmount) } : {}),
+    },
+  });
+}
+export const archiveDebt = (id: string) => prisma.debt.updateMany({ where: { id }, data: { archivedAt: new Date() } });
 
 /**
  * Pagamento de dívida = saída de caixa que reduz o saldo devedor (tipo DEBT_PAYMENT).
@@ -150,7 +167,7 @@ export async function debtsOverview(extra = 0) {
     const base = pay > 0 ? simulatePayoff({ balance, monthlyRate: rate, payment: pay }) : null;
     const withExtra = pay > 0 && extra > 0 ? simulatePayoff({ balance, monthlyRate: rate, payment: pay, extra }) : null;
     return {
-      id: x.id, name: x.name, creditor: x.creditor, original: cents(x.originalAmount), balance, paid: cents(x.originalAmount) - balance,
+      id: x.id, name: x.name, kind: x.kind, creditor: x.creditor, original: cents(x.originalAmount), balance, paid: cents(x.originalAmount) - balance,
       installmentAmount: pay || null, nextDueDate: x.nextDueDate ? dateOut(x.nextDueDate) : null, monthlyRate: rate || null,
       payoffMonths: base?.months ?? null, payoffDate: base?.months ? dateOut(addMonths(todayBR(), base.months)) : null,
       simulation: withExtra && base ? { months: withExtra.months, monthsSaved: base.months !== null && withExtra.months !== null ? base.months - withExtra.months : null, interestSaved: base.totalInterest - withExtra.totalInterest } : null,

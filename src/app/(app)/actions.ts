@@ -17,6 +17,7 @@ import * as inv from "@/server/services/investments";
 import * as stmt from "@/server/services/statements";
 import * as accounts from "@/server/services/users";
 import * as tokens from "@/server/services/apitokens";
+import * as finplan from "@/server/services/plan";
 import * as pluggy from "@/server/services/pluggy";
 import { headers } from "next/headers";
 import { pushPrefsSchema } from "@/server/push-prefs";
@@ -118,3 +119,9 @@ export async function bankMap(id: string, target: { accountId?: string; cardId?:
 export async function bankUnmap(id: string) { return run(async () => { await pluggy.unmapLinkAccount(id); }); }
 export async function bankSync(linkId: string) { return run(() => pluggy.syncLink(linkId)); }
 export async function bankUnlink(linkId: string) { return run(async () => { await pluggy.unlinkBank(linkId); }); }
+
+/* Plano de quitação, orçamento ideal e despesas fixas */
+export async function savePlan(v: unknown) { return run(async () => { const p = await assertOwner(); await finplan.savePlanPrefs(p.id, v); }); }
+export async function saveFixedExpense(v: Parameters<typeof finplan.addFixedExpense>[0]) { return run(async () => { await finplan.addFixedExpense(v); await rec.generateRecurring(); }); }
+export async function editDebt(id: string, v: Parameters<typeof plan.updateDebt>[1]) { return run(async () => { await plan.updateDebt(id, v); }); }
+export async function removeDebt(id: string) { return run(async () => { await plan.archiveDebt(id); }); }

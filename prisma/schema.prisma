@@ -100,6 +100,7 @@ model Profile {
   theme              String    @default("system")
   hideValues         Boolean   @default(false)
   notifyPrefs        Json      @default("{}")
+  planPrefs          Json      @default("{}") // plano financeiro: renda informada, gasto variável escolhido, estratégia de quitação
   currency           String    @default("BRL")
   role               Role      @default(USER)
   active             Boolean   @default(true) // desativada: não consegue entrar
@@ -491,6 +492,7 @@ model Debt {
   installmentAmount Decimal?  @db.Decimal(14, 2)
   installmentsTotal Int?
   nextDueDate       DateTime? @db.Date
+  kind              String    @default("OUTRO") // CARTAO | VEICULO | FINANCIAMENTO | EMPRESTIMO | OUTRO (só para organizar)
   archivedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -605,6 +607,7 @@ enum PushKind {
   SPEND // "pense antes de gastar"
   INVEST // incentivo a investir
   MOTIVATION // incentivo "não desista" (o que você perde se parar)
+  PERSONAL // mensagem montada na hora com os SEUS números (gastos pequenos acumulados, ritmo do mês, dívidas…)
 }
 
 // Um horário sorteado do dia para uma mensagem. (day, slot) único: gerar de novo nunca duplica.

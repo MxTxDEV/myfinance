@@ -6,6 +6,9 @@ import { pushConfigured, sendToAll } from "../push";
 import { ensureDailyMessage } from "./daily";
 import { generateCelebrations, generateNotifications } from "./notifications";
 import { generateRecurring } from "./recurring";
+import { personalMessages } from "@/domain/messages-personal";
+import { personalStats } from "./personal";
+import { INVEST_EXTRA_MESSAGES, MOTIVATION_EXTRA_MESSAGES, SPEND_EXTRA_MESSAGES } from "@/domain/messages-extra";
 import { MESSAGES, messageForDay, pickMessage, stripEmoji, styleMessage } from "@/domain/messages";
 import { INVEST_MESSAGES } from "@/domain/messages-invest";
 import { MOTIVATION_MESSAGES } from "@/domain/messages-motivation";
@@ -15,6 +18,12 @@ import { parseISODate } from "@/domain/dates";
 /** Um horário sorteado que passou mais que isso do momento (agendador parado) não é enviado: evita mensagem fora de hora. */
 const MAX_LATE_MS = 2 * 3_600_000;
 const MORNING_GAP_MIN = 30; // depois da mensagem da manhã, o 1º sorteio só a partir de +30 min
+
+// Bancos de mensagens do dia (as antigas + as novas). A mensagem da manhã continua usando só o banco original (ordem estável).
+const SPEND_POOL: readonly string[] = [...MESSAGES, ...SPEND_EXTRA_MESSAGES];
+const INVEST_POOL: readonly string[] = [...INVEST_MESSAGES, ...INVEST_EXTRA_MESSAGES];
+const MOTIVATION_POOL: readonly string[] = [...MOTIVATION_MESSAGES, ...MOTIVATION_EXTRA_MESSAGES];
+const COUNTER_STRIDE = 1000; // até 100 mensagens por dia sem repetir o contador de um dia no seguinte
 
 const dayNumber = (day: string) => Math.floor(parseISODate(day).getTime() / 86_400_000);
 
@@ -41,22 +50,22 @@ export async function ensureSchedule(now: Date, prefs: PushPrefs): Promise<PushS
     rows.push({ day, slot: slot++, at: localInstant(day, start), kind: "MORNING", message: messageForDay(day), prefsKey: key });
   }
 
-  const kinds: PushKind[] = [...(prefs.spend ? ["SPEND" as const] : []), ...(prefs.invest ? ["INVEST" as const] : []), ...(prefs.motivation ? ["MOTIVATION" as const] : [])];
+  const kinds: PushKind[] = [...(prefs.spend ? ["SPEND" as const] : []), ...(prefs.invest ? ["INVEST" as const] : []), ...(prefs.motivation ? ["MOTIVATION" as const] : []), ...(prefs.personal ? ["PERSONAL" as const] : [])];
   const already = used.filter((s) => s.kind !== "MORNING").length;
   const need = kinds.length === 0 ? 0 : Math.max(0, prefs.perDay - already);
   const from = Math.max(prefs.morning ? start + MORNING_GAP_MIN : start, stale || used.length ? minutes + 10 : 0);
   const mins = randomMinutes({ startMin: from, endMin: end, count: need, gapMin: prefs.minGapMinutes, seed: `${day}|${key}|${already}` });
   mins.forEach((m, i) => {
     const kind = kinds[(already + i) % kinds.length]; // alterna entre as categorias ligadas
-    const bank = kind === "INVEST" ? INVEST_MESSAGES : kind === "MOTIVATION" ? MOTIVATION_MESSAGES : MESSAGES;
-    rows.push({ day, slot: slot++, at: localInstant(day, m), kind, message: pickMessage(bank, dayNumber(day) * 10 + (already + i)), prefsKey: key });
+    const bank = kind === "INVEST" ? INVEST_POOL : kind === "MOTIVATION" ? MOTIVATION_POOL : SPEND_POOL; // PERSONAL: este texto é o reserva; o definitivo é montado no envio
+    rows.push({ day, slot: slot++, at: localInstant(day, m), kind, message: pickMessage(bank, dayNumber(day) * COUNTER_STRIDE + (already + i)), prefsKey: key });
   });
 
   if (rows.length) await prisma.pushSlot.createMany({ data: rows, skipDuplicates: true });
   return prisma.pushSlot.findMany({ where: { day }, orderBy: { slot: "asc" } });
 }
 
-const TITLES: Record<PushKind, string> = { MORNING: "🌅 Bom dia — antes de gastar", SPEND: "🛑 Antes de gastar", INVEST: "📈 Que tal investir?", MOTIVATION: "💪 Não desista" };
+const TITLES: Record<PushKind, string> = { MORNING: "🌅 Bom dia — antes de gastar", SPEND: "🛑 Antes de gastar", INVEST: "📈 Que tal investir?", MOTIVATION: "💪 Não desista", PERSONAL: "🎯 Pra você, agora" };
 
 /** Envia os horários que já chegaram. Cada horário é "reservado" antes do envio: dois agendadores nunca enviam o mesmo duas vezes. */
 export async function sendDueSlots(now: Date, prefs: PushPrefs) {
@@ -70,7 +79,15 @@ export async function sendDueSlots(now: Date, prefs: PushPrefs) {
     }
     const claim = await prisma.pushSlot.updateMany({ where: { id: s.id, sentAt: null, skipped: false }, data: { sentAt: now } });
     if (claim.count !== 1) continue; // outro agendador já pegou
-    const body = styleMessage(s.message, prefs.emojis);
+    let text = s.message;
+    if (s.kind === "PERSONAL") {
+      // Monta com os números de AGORA (compras pequenas acumuladas, ritmo do mês, dívidas). Sem dados → mantém o texto reserva.
+      try {
+        const lines = personalMessages(await personalStats(now));
+        if (lines.length) { text = pickMessage(lines, dayNumber(s.day) * COUNTER_STRIDE + s.slot); await prisma.pushSlot.update({ where: { id: s.id }, data: { message: text } }); }
+      } catch (e) { console.error("mensagem personalizada falhou", e instanceof Error ? e.name : "erro"); }
+    }
+    const body = styleMessage(text, prefs.emojis);
     const title = prefs.emojis ? TITLES[s.kind] : stripEmoji(TITLES[s.kind]);
     const r = await sendToAll({ title, body, url: "/?msg=1", tag: `msg-${s.day}-${s.slot}` });
     if (r.sent === 0) { await prisma.pushSlot.update({ where: { id: s.id }, data: { sentAt: null } }); continue; } // nenhum aparelho recebeu: tenta no próximo tick

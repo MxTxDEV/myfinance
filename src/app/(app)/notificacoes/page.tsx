@@ -12,7 +12,7 @@ import { MarkRead } from "./mark-read";
 import { SchedulerStatus } from "@/components/scheduler-status";
 import { pushConfigured } from "@/server/push";
 
-const KIND = { MORNING: "🌅 Manhã", SPEND: "🛑 Pensar antes de gastar", INVEST: "📈 Investir", MOTIVATION: "💪 Incentivo" } as const;
+const KIND = { MORNING: "🌅 Manhã", SPEND: "🛑 Pensar antes de gastar", INVEST: "📈 Investir", MOTIVATION: "💪 Incentivo", PERSONAL: "🎯 Personalizada" } as const;
 
 export default async function Notificacoes() {
   const owner = await requireOwner();

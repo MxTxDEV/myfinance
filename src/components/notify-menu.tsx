@@ -33,22 +33,21 @@ export function NotifyMenu({ initial }: { initial: PushPrefs }) {
       <Check checked={p.morning} onChange={(v) => set("morning", v)} hint="Sempre no início do horário, para começar o dia pensando.">Mensagem da manhã</Check>
       <div className="grid grid-cols-2 gap-3 py-2">
         <label className="text-sm text-muted">Mensagens sorteadas por dia
-          <select value={p.perDay} onChange={(e) => set("perDay", Number(e.target.value))} className={`${field} mt-1`}>
-            {Array.from({ length: 11 }, (_, n) => <option key={n} value={n}>{n === 0 ? "Nenhuma" : n}</option>)}
-          </select>
+          <input type="number" inputMode="numeric" min={0} max={100} value={p.perDay} onChange={(e) => set("perDay", Math.max(0, Math.min(100, Math.floor(Number(e.target.value) || 0))))} className={`${field} mt-1`} aria-label="Mensagens sorteadas por dia (0 a 100)" />
         </label>
         <label className="text-sm text-muted">Intervalo mínimo
           <select value={p.minGapMinutes} onChange={(e) => set("minGapMinutes", Number(e.target.value))} className={`${field} mt-1`}>
-            {[30, 60, 90, 120, 180].map((n) => <option key={n} value={n}>{n >= 60 ? `${n / 60} h` : `${n} min`}</option>)}
+            {[5, 10, 15, 30, 60, 90, 120, 180].map((n) => <option key={n} value={n}>{n >= 60 ? `${n / 60} h` : `${n} min`}</option>)}
           </select>
         </label>
         <label className="text-sm text-muted">A partir de<input type="time" value={p.windowStart} onChange={(e) => set("windowStart", e.target.value)} className={`${field} mt-1`} /></label>
         <label className="text-sm text-muted">Até<input type="time" value={p.windowEnd} onChange={(e) => set("windowEnd", e.target.value)} className={`${field} mt-1`} /></label>
       </div>
-      <p className="text-xs text-muted">Os horários são sorteados todo dia dentro dessa janela. Fora dela você não recebe nada, nem avisos. Hoje: até {total} {total === 1 ? "mensagem" : "mensagens"}.</p>
+      <p className="text-xs text-muted">Os horários são sorteados todo dia dentro dessa janela. Fora dela você não recebe nada, nem avisos. Hoje: até {total} {total === 1 ? "mensagem" : "mensagens"}.{p.perDay > 20 ? " Muitas mensagens: o celular pode agrupá-las. Para chegarem nos horários sorteados, o agendador (cron-job.org) precisa rodar a cada 1–5 minutos." : ""}</p>
       <Check checked={p.spend} onChange={(v) => set("spend", v)} hint="Mensagens duras para frear o gasto por impulso.">Pense antes de gastar</Check>
       <Check checked={p.invest} onChange={(v) => set("invest", v)} hint="Mensagens que incentivam investir em vez de gastar.">Invista em vez de gastar</Check>
       <Check checked={p.motivation} onChange={(v) => set("motivation", v)} hint="Frases diretas sobre o que você perde se desistir.">Incentivo (não desista)</Check>
+      <Check checked={p.personal} onChange={(v) => set("personal", v)} hint="Frases com os SEUS números: compras pequenas acumuladas, ritmo do mês, despesas fixas e dívidas.">Personalizadas (com os meus dados)</Check>
       <Check checked={p.emojis} onChange={(v) => set("emojis", v)}>Usar emojis 🔥</Check>
 
       <h3 className={sub}>Avisos de vencimento</h3>

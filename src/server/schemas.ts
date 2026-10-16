@@ -139,6 +139,14 @@ export const debtInput = z.object({
   installmentAmount: money.optional(),
   installmentsTotal: z.number().int().min(1).max(600).optional(),
   nextDueDate: isoDate.optional(),
+  kind: z.enum(["CARTAO", "VEICULO", "FINANCIAMENTO", "EMPRESTIMO", "OUTRO"]).optional(),
+});
+export const debtUpdateInput = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  balance: z.number().int().min(0).optional(),
+  monthlyRate: z.number().min(0).max(100).nullable().optional(),
+  installmentAmount: money.nullable().optional(),
+  kind: z.enum(["CARTAO", "VEICULO", "FINANCIAMENTO", "EMPRESTIMO", "OUTRO"]).optional(),
 });
 export const debtPaymentInput = z.object({
   debtId: id,
