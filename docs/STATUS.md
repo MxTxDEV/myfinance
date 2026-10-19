@@ -31,3 +31,4 @@ Limitações: os horários aleatórios exigem um agendador externo chamando `/ap
 - Pluggy (Open Finance): implementado (widget, mapeamento, sincronização idempotente, webhook, reconciliação); testes com API simulada. Falta validar em sandbox com credenciais reais.
 - Mensagens: até 100/dia, personalizadas com os dados do usuário; Planejamento: plano de quitação (avalanche/bola de neve), orçamento ideal ("quanto posso gastar"), despesas fixas simples, tipos de dívida e edição.
 - Aba Cartões (Planejamento): por cartão, fatura atual/próxima/seguintes, limite usado, informar saldo e parcelas por fatura, juros; cartões entram sozinhos no plano de quitação.
+- Landing page premium (/bem-vindo e / para visitantes): capturas reais com dados fictícios, motion em CSS, bento, demo guiada, analytics preparado, SEO; pendentes: preços, termos/privacidade, vídeo, analytics real (docs/LANDING.md).

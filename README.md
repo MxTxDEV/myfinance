@@ -26,6 +26,9 @@ npm run dev
 ## Lançamento automático (cartão/banco)
 Veja [docs/AUTOMACAO.md](docs/AUTOMACAO.md): chave pessoal + endpoint `POST /api/ingest/transaction` para Atalhos do iPhone/Tasker. Ligação direta com o banco via Open Finance (Pluggy): [docs/OPEN_FINANCE.md](docs/OPEN_FINANCE.md).
 
+## Landing page
+Página comercial em `/bem-vindo` (e em `/` para visitantes). Textos, planos, vídeo e links ficam em `src/config/landing.ts`; guia completo em [docs/LANDING.md](docs/LANDING.md).
+
 ## Testes
 
 ```bash

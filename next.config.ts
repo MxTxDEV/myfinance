@@ -9,7 +9,8 @@ const csp = [
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   "connect-src 'self' https://*.pluggy.ai",
-  "frame-src https://*.pluggy.ai", // widget de conexão bancária (Open Finance); o banco é autorizado lá, nunca no app
+  "media-src 'self' https:", // vídeo da landing (MP4 por URL configurável)
+  "frame-src https://*.pluggy.ai https://www.youtube-nocookie.com https://player.vimeo.com", // widget de conexão bancária (Open Finance); o banco é autorizado lá, nunca no app
   "worker-src 'self' blob:", // leitura de PDF (pdf.js) roda em um worker do próprio site
   "frame-ancestors 'none'",
   "base-uri 'self'",

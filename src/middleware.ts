@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const PUBLIC = ["/login", "/cadastro", "/manifest.webmanifest", "/icon.svg", "/sw.js", "/offline", "/pdf.worker.min.mjs"];
+const PUBLIC = ["/bem-vindo", "/robots.txt", "/sitemap.xml", "/login", "/cadastro", "/manifest.webmanifest", "/icon.svg", "/sw.js", "/offline", "/pdf.worker.min.mjs"];
 // /api/cron/* se protege sozinha com CRON_SECRET (o agendador não tem cookie de sessão).
-const PUBLIC_PREFIX = ["/sounds/", "/api/cron/", "/api/ingest/", "/api/webhooks/"]; // ingest: autenticada por chave própria (ver ApiToken)
+const PUBLIC_PREFIX = ["/landing/", "/bem-vindo/", "/sounds/", "/api/cron/", "/api/ingest/", "/api/webhooks/"]; // ingest: autenticada por chave própria (ver ApiToken)
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -17,6 +17,8 @@ export async function middleware(req: NextRequest) {
     } catch { /* inválido/expirado */ }
   }
   if (ok) return NextResponse.next();
+  // Visitante sem sessão em "/" vê a página de apresentação. O app instalado (start_url "/?pwa=1") continua indo para o login.
+  if (pathname === "/" && !req.nextUrl.searchParams.has("pwa")) return NextResponse.rewrite(new URL("/bem-vindo", req.url));
   if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const url = req.nextUrl.clone();
   url.pathname = "/login";
