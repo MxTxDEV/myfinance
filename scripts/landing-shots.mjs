@@ -15,6 +15,8 @@ const shots = [
   ["orcamentos", "/planejamento?tab=orcamentos", 0],
   ["notificacoes", "/notificacoes", "Organizar notificações"],
   ["fixas", "/planejamento?tab=compromissos", 0],
+  ["movimentacoes", "/movimentacoes", 0],
+  ["investimentos", "/planejamento?tab=investimentos", 0],
 ];
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium" });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: "dark", locale: "pt-BR", timezoneId: "America/Sao_Paulo" });

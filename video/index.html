@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>SaldoUP — comercial</title>
+<style>
+@font-face { font-family: "InterV"; src: url("fonts/inter-latin-wght-normal.woff2") format("woff2"); font-weight: 100 900; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "InterV"; src: url("fonts/inter-latin-ext-wght-normal.woff2") format("woff2"); font-weight: 100 900; unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+:root { --bg: #05070a; --acc: #8b84ff; --acc2: #3dd68c; --bad: #ff7a7e; --mut: #9aa6b6; --line: rgba(255,255,255,.1); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #000; overflow: hidden; }
+body { font-family: "InterV", Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; letter-spacing: -0.02em; }
+#stage { position: relative; overflow: hidden; background: var(--bg); color: #eef1f5; transform-origin: 0 0; }
+.abs { position: absolute; will-change: transform, opacity, filter; }
+.glow { border-radius: 50%; filter: blur(80px); mix-blend-mode: screen; }
+.gridbg { background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); background-size: 90px 90px; -webkit-mask-image: radial-gradient(60% 50% at 50% 45%, #000 20%, transparent 75%); mask-image: radial-gradient(60% 50% at 50% 45%, #000 20%, transparent 75%); }
+.word { display: inline-block; white-space: pre; will-change: transform, opacity, filter; }
+.kin { font-weight: 800; line-height: 1.04; letter-spacing: -0.04em; }
+.grad { background: linear-gradient(100deg, #fff 5%, #c9c5ff 40%, #8b84ff 70%, #3dd68c 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.gradbad { background: linear-gradient(100deg, #fff 0%, #ffb3b5 40%, #ff7a7e 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.dim { color: #6c7684; }
+.tile { border-radius: 34px; overflow: hidden; border: 1.5px solid rgba(255,255,255,.14); background-color: #0b0d10; background-repeat: no-repeat; box-shadow: 0 40px 90px -20px rgba(0,0,0,.9); }
+.phone { border-radius: 92px; padding: 18px; background: linear-gradient(160deg, #2c333e, #0c1015 42%, #1c222b); box-shadow: 0 0 0 2px rgba(255,255,255,.1) inset, 0 80px 160px -40px rgba(0,0,0,.95); }
+.phone::before { content: ""; position: absolute; top: 30px; left: 50%; width: 170px; height: 46px; transform: translateX(-50%); border-radius: 99px; background: #05070a; z-index: 5; }
+.screen { position: relative; border-radius: 76px; overflow: hidden; background: #0b0d10; }
+.screen .img { position: absolute; inset: 0; background-size: 100% 100%; background-repeat: no-repeat; }
+.hl { position: absolute; left: 3%; right: 3%; border-radius: 34px; border: 3px solid var(--acc2); box-shadow: 0 0 0 9999px rgba(5,7,10,0), 0 0 70px rgba(61,214,140,.55), inset 0 0 40px rgba(61,214,140,.18); }
+.chip { border-radius: 99px; padding: 22px 38px; font-weight: 650; background: rgba(18,24,32,.78); border: 1.5px solid rgba(255,255,255,.16); backdrop-filter: blur(14px); box-shadow: 0 30px 80px -20px rgba(0,0,0,.85); white-space: nowrap; }
+.cap { text-align: center; font-weight: 650; line-height: 1.25; text-shadow: 0 4px 30px rgba(0,0,0,.9); }
+.cap .w { display: inline-block; white-space: pre; }
+.pill { display: inline-flex; align-items: center; gap: 22px; border-radius: 99px; font-weight: 750; color: #0b0d10; background: linear-gradient(180deg, #a09aff, #8b84ff); box-shadow: 0 1px 0 rgba(255,255,255,.55) inset, 0 30px 100px -10px rgba(139,132,255,.8); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+const Q = new URLSearchParams(location.search);
+const V = (Q.get("o") || "v") === "v";               // v = vertical 1080x1920 · h = horizontal 1920x1080
+const W = V ? 1080 : 1920, H = V ? 1920 : 1080, DUR = 37.6;
+const BRAND = "SaldoUP";
+const URL_SITE = Q.get("url") || "joaofinance.vercel.app";   // endereço mostrado no final (edite aqui ou use ?url=)
+
+// ───────── utilidades de tempo e easing ─────────
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const P = (t, a, b) => clamp((t - a) / (b - a));
+const E = { out: (x) => 1 - Math.pow(1 - x, 3), in: (x) => x * x * x, io: (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2), back: (x) => { const c1 = 1.5, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }, expo: (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x)) };
+const lerp = (a, b, k) => a + (b - a) * k;
+const vis = (t, a, b, fi = .35, fo = .35) => E.io(P(t, a, a + fi)) * (1 - E.io(P(t, b - fo, b)));
+const noise = (x) => Math.sin(x * 12.9898) * 43758.5453 % 1;           // ruído determinístico
+function kf(t, frames, ease = E.io) {                                     // [[tempo, valor], …] → valor interpolado
+  if (t <= frames[0][0]) return frames[0][1];
+  for (let i = 1; i < frames.length; i++) if (t <= frames[i][0]) { const [a, va] = frames[i - 1], [b, vb] = frames[i]; return lerp(va, vb, ease(P(t, a, b))); }
+  return frames[frames.length - 1][1];
+}
+
+// ───────── DOM ─────────
+const stage = document.getElementById("stage");
+stage.style.width = W + "px"; stage.style.height = H + "px";
+const el = (cls, css = {}, parent = stage, html = "") => { const d = document.createElement("div"); d.className = cls; Object.assign(d.style, css); d.innerHTML = html; parent.appendChild(d); return d; };
+const IMG = (n) => `assets/${n}.webp`;
+
+// fundo: base + brilhos que respiram + grade
+const bg = {
+  v: el("abs glow", { width: W * .9 + "px", height: W * .9 + "px", background: "radial-gradient(closest-side, rgba(139,132,255,.55), transparent)" }),
+  g: el("abs glow", { width: W * .7 + "px", height: W * .7 + "px", background: "radial-gradient(closest-side, rgba(61,214,140,.35), transparent)" }),
+  r: el("abs glow", { width: W * .85 + "px", height: W * .85 + "px", background: "radial-gradient(closest-side, rgba(255,90,100,.5), transparent)", opacity: 0 }),
+  grid: el("abs gridbg", { inset: 0, opacity: .55 }),
+};
+const L = V ? {
+  textX: 80, textY: 150, textW: 920, kin: 118, phoneX: 540, phoneY: 1030, phoneS: .78, capY: 1686, capW: 940, capSize: 44,
+} : {
+  textX: 110, textY: 250, textW: 900, kin: 104, phoneX: 1400, phoneY: 470, phoneS: .58, capY: 956, capW: 1500, capSize: 36,
+};
+
+// ───────── texto cinético ─────────
+function kinetic(def) {   // def: { a, b, text, cls, size, x, y, w, align, out }
+  const gcls = /grad/.test(def.cls || "") ? def.cls : "";
+  const wrap = el("abs kin " + (gcls ? "" : def.cls || ""), { left: def.x + "px", top: def.y + "px", width: def.w + "px", fontSize: (def.size || L.kin) + "px", textAlign: def.align || "left", opacity: 0 });
+  const words = def.text.split(" ").map((w) => { const s = document.createElement("span"); s.className = "word " + gcls; s.textContent = w + " "; wrap.appendChild(s); return { s, len: w.length + 2 }; });
+  const total = words.reduce((x, w) => x + w.len, 0);
+  let acc = 0; const span = (def.b - def.a) * .85;
+  words.forEach((w) => { w.t0 = def.a + (acc / total) * span; acc += w.len; });
+  return { def, wrap, words };
+}
+function updKinetic(k, t) {
+  const { a, out = k.def.b + .6 } = k.def;
+  const fade = 1 - E.io(P(t, out - .35, out));
+  k.wrap.style.opacity = t < a - .01 ? 0 : fade;
+  if (k.def.y2 !== undefined) k.wrap.style.top = lerp(k.def.y, k.def.y2, E.io(P(t, a, out))) + "px";
+  k.words.forEach((w) => {
+    const p = E.out(P(t, w.t0, w.t0 + .45));
+    w.s.style.opacity = p; w.s.style.transform = `translateY(${(1 - p) * 70}px) scale(${lerp(.94, 1, p)})`; w.s.style.filter = `blur(${(1 - p) * 16}px)`;
+  });
+}
+
+// ───────── celular (compartilhado nas cenas 3–5) ─────────
+const PH = { w: 600, h: 1344, bez: 18 };
+const phone = el("abs phone", { width: PH.w + PH.bez * 2 + "px", height: PH.h + PH.bez * 2 + "px", left: -9999 + "px", top: 0, opacity: 0 });
+const screen = el("screen", { width: PH.w + "px", height: PH.h + "px" }, phone);
+const screens = {};
+["inicio", "orcamentos", "fixas", "investimentos", "dividas", "cartoes", "metas"].forEach((n) => { screens[n] = el("img", { backgroundImage: `url(${IMG(n)})`, opacity: 0 }, screen); });
+const hl = el("hl", { opacity: 0 }, screen);
+const shine = el("abs", { left: 0, right: 0, height: "260px", background: "linear-gradient(180deg, transparent, rgba(139,132,255,.28), transparent)", opacity: 0 }, screen);
+const phoneGlow = el("abs glow", { width: "1100px", height: "1100px", background: "radial-gradient(closest-side, rgba(139,132,255,.5), transparent)", opacity: 0 });
+function placePhone(x, y, s, o, rx = 0, ry = 0, rz = 0) {
+  phone.style.opacity = o; phone.style.left = (x - (PH.w + PH.bez * 2) / 2) + "px"; phone.style.top = (y - (PH.h + PH.bez * 2) / 2) + "px";
+  phone.style.transform = `perspective(2600px) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg) scale(${s})`;
+  phoneGlow.style.opacity = o * .9; phoneGlow.style.left = (x - 550) + "px"; phoneGlow.style.top = (y - 550) + "px";
+}
+function setScreen(weights) { Object.keys(screens).forEach((k) => { screens[k].style.opacity = weights[k] || 0; }); }
+
+// ───────── recortes de telas reais (colagem do caos e halo de funcionalidades) ─────────
+function crop(img, y0, y1, w, extra = {}) {
+  const sc = w / 600, h = (y1 - y0) * sc;
+  return el("abs tile", Object.assign({ width: w + "px", height: h + "px", backgroundImage: `url(${IMG(img)})`, backgroundSize: `${w}px ${1344 * sc}px`, backgroundPosition: `0 ${-y0 * sc}px`, opacity: 0 }, extra));
+}
+const tw = V ? 560 : 440;
+const chaos = [
+  { c: crop("dividas", 225, 720, tw), x: .5, y: .22, r: -7, d: 1 },
+  { c: crop("cartoes", 225, 500, tw), x: .72, y: .46, r: 6, d: 2 },
+  { c: crop("metas", 470, 830, tw), x: .27, y: .5, r: 9, d: 3 },
+  { c: crop("fixas", 310, 690, tw), x: .68, y: .72, r: -8, d: 4 },
+  { c: crop("inicio", 704, 1062, tw), x: .3, y: .78, r: 5, d: 5 },
+  { c: crop("investimentos", 226, 440, tw), x: .5, y: .58, r: -4, d: 6 },
+];
+const flowW = V ? 700 : 620, flowSc = flowW / 600, flowH = 730 * flowSc;
+const flow = el("abs tile", { width: flowW + "px", height: flowH + "px", opacity: 0, backgroundImage: "none" });
+const flowA = el("abs", { left: 0, width: flowW + "px", height: flowH + "px", backgroundImage: `url(${IMG("movimentacoes")})`, backgroundSize: `${flowW}px ${1344 * flowSc}px`, backgroundPosition: `0 ${-520 * flowSc}px`, backgroundRepeat: "no-repeat" }, flow);
+const flowB = el("abs", { left: 0, width: flowW + "px", height: flowH + "px", backgroundImage: `url(${IMG("movimentacoes")})`, backgroundSize: `${flowW}px ${1344 * flowSc}px`, backgroundPosition: `0 ${-520 * flowSc}px`, backgroundRepeat: "no-repeat" }, flow);
+const saldo = crop("inicio", 1090, 1272, V ? 760 : 640);
+const halo = [
+  { c: crop("cartoes", 535, 880, V ? 330 : 280), name: "Cartões", ang: -150 },
+  { c: crop("dividas", 740, 1190, V ? 330 : 280), name: "Dívidas", ang: -30 },
+  { c: crop("metas", 470, 830, V ? 330 : 280), name: "Metas", ang: 150 },
+  { c: crop("investimentos", 226, 440, V ? 330 : 280), name: "Investimentos", ang: 30 },
+];
+
+// ───────── logotipo (wordmark) ─────────
+function logoHTML(size) {
+  return `<span style="display:inline-flex;align-items:center;gap:${size * .28}px;font-weight:800;letter-spacing:-.045em;font-size:${size}px;line-height:1">
+    <svg width="${size * .95}" height="${size * .95}" viewBox="0 0 512 512"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a09aff"/><stop offset="1" stop-color="#3dd68c"/></linearGradient></defs>
+    <rect x="9" y="9" width="494" height="494" rx="120" fill="#10151c" stroke="url(#lg)" stroke-width="14"/><path d="M148 350l108-190 108 190" fill="none" stroke="url(#lg)" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>Saldo<span style="background:linear-gradient(100deg,#a09aff,#3dd68c);-webkit-background-clip:text;background-clip:text;color:transparent">UP</span></span></span>`;
+}
+const logoBig = el("abs", { left: 0, width: W + "px", textAlign: "center", opacity: 0 }, stage, logoHTML(V ? 150 : 150));
+const sheen = el("abs", { top: 0, bottom: 0, width: "220px", background: "linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent)", transform: "skewX(-18deg)", mixBlendMode: "overlay", opacity: 0 }, logoBig);
+const ring = el("abs", { width: "300px", height: "300px", borderRadius: "50%", border: "3px solid rgba(139,132,255,.8)", opacity: 0 });
+const ring2 = el("abs", { width: "300px", height: "300px", borderRadius: "50%", border: "2px solid rgba(61,214,140,.7)", opacity: 0 });
+const flash = el("abs", { inset: 0, background: "radial-gradient(closest-side at 50% 50%, rgba(255,255,255,.9), rgba(160,154,255,.35) 40%, transparent 70%)", opacity: 0 });
+
+// ───────── textos por cena ─────────
+const kx = L.textX, kw = L.textW, ky = L.textY;
+const K = [
+  // 1) 0–5,6
+  kinetic({ a: .05, b: 1.78, out: 2.1, text: "Você trabalha para ganhar dinheiro.", x: kx, y: ky, w: kw }),
+  kinetic({ a: 2.16, b: 5.1, out: 5.55, text: "Mas sabe para onde ele está indo?", x: kx, y: ky + (V ? 60 : 40), w: kw, cls: "grad", size: L.kin * 1.05 }),
+  // 2) caos 5,65–12,9
+  kinetic({ a: 5.7, b: 7.2, out: 12.4, text: "Contas espalhadas,", x: kx, y: ky, w: kw, size: L.kin * .74 }),
+  kinetic({ a: 7.5, b: 9.0, out: 12.4, text: "gastos esquecidos", x: kx, y: ky + L.kin * .8, w: kw, size: L.kin * .74 }),
+  kinetic({ a: 9.15, b: 10.4, out: 12.4, text: "e falta de clareza.", x: kx, y: ky + L.kin * 1.6, w: kw, size: L.kin * .74 }),
+  kinetic({ a: 11.75, b: 12.35, out: 12.8, text: "Confusão.", x: kx, y: ky + L.kin * 2.55, w: kw, cls: "gradbad", size: L.kin * 1.2 }),
+  // 3) 13–19,6
+  kinetic({ a: 14.55, b: 15.9, out: 16.9, text: "Mais prático.", x: kx, y: ky + (V ? 0 : 60), w: kw, cls: "grad" }),
+  kinetic({ a: 17.05, b: 19.3, out: 19.9, text: "Tudo organizado em um só lugar.", x: kx, y: ky + (V ? 0 : 60), w: kw, cls: "grad" }),
+  // 4) 20–26
+  kinetic({ a: 20.05, b: 21.9, out: 22.3, text: "Acompanhe seus gastos.", x: kx, y: ky, w: kw }),
+  kinetic({ a: 22.35, b: 24.0, out: 24.4, text: "Organize suas despesas.", x: kx, y: ky, w: kw }),
+  kinetic({ a: 24.45, b: 25.9, out: 26.35, text: "Visualize seus investimentos.", x: kx, y: ky, w: kw }),
+  // 5) 26,35–31,3
+  kinetic({ a: 26.4, b: 28.3, out: 28.7, text: "Menos tempo tentando entender.", x: kx, y: ky, w: kw, cls: "dim" }),
+  kinetic({ a: 28.8, b: 30.9, out: 31.4, text: "Mais clareza para decidir.", x: kx, y: ky, w: kw, cls: "grad", size: L.kin * 1.04 }),
+  // 6) final
+  kinetic({ a: 33.2, b: 36.0, out: 99, text: "Uma nova maneira de cuidar do seu dinheiro.", x: V ? 90 : 110, y: V ? 640 : 330, w: V ? 900 : 1000, align: V ? "center" : "left", size: V ? 84 : 84, cls: "grad" }),
+];
+
+// ───────── legendas (narração) com destaque palavra a palavra ─────────
+const CAPS = [
+  [0.0, 1.78, "Você trabalha para ganhar dinheiro."],
+  [2.16, 5.14, "Mas será que sabe exatamente para onde ele está indo?"],
+  [5.65, 12.59, "Contas espalhadas, gastos esquecidos e falta de clareza podem transformar sua vida financeira em uma verdadeira confusão."],
+  [13.0, 14.16, "Conheça o SaldoUP,"],
+  [14.48, 19.64, "uma maneira mais prática de acompanhar suas finanças e ter suas informações organizadas em um só lugar."],
+  [20.02, 26.03, "Acompanhe seus gastos, organize suas despesas e visualize seus investimentos diretamente na plataforma."],
+  [26.35, 28.51, "Menos tempo tentando entender seus números."],
+  [28.77, 31.29, "Mais clareza para tomar decisões com consciência."],
+  [31.63, 32.79, "Conheça o SaldoUP."],
+  [33.17, 36.5, "Acesse o site e descubra uma nova maneira de cuidar do seu dinheiro."],
+].map(([a, b, text]) => {
+  const box = el("abs cap", { left: (V ? 70 : 210) + "px", top: L.capY + "px", width: L.capW + "px", fontSize: L.capSize + "px", opacity: 0 });
+  const words = text.split(" "); const lens = words.map((w) => w.length + 1 + (/[,.?]$/.test(w) ? 2.5 : 0)); const tot = lens.reduce((x, y) => x + y, 0);
+  let acc = 0;
+  const ws = words.map((w, i) => { const s = document.createElement("span"); s.className = "w"; s.textContent = w + " "; box.appendChild(s); const o = { s, t0: a + (acc / tot) * (b - a), t1: a + ((acc + lens[i]) / tot) * (b - a) }; acc += lens[i]; return o; });
+  return { a, b, box, ws };
+});
+
+const foot = el("abs", { left: 0, width: W + "px", textAlign: "center", fontSize: "24px", color: "#7f8b9b", top: (H - 56) + "px", opacity: 0, letterSpacing: "0" }, stage, "Telas do aplicativo, com dados fictícios.");
+const cta = el("abs pill", { fontSize: V ? "62px" : "62px", padding: V ? "38px 78px" : "36px 74px", left: 0, top: 0, opacity: 0 }, stage, `Acesse o site <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#0b0d10" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>`);
+const urlTag = el("abs", { left: 0, width: W + "px", textAlign: "center", fontSize: V ? "48px" : "48px", fontWeight: 650, color: "#c9c5ff", opacity: 0, letterSpacing: "-0.01em" }, stage, URL_SITE);
+const capbg = el("abs", { left: 0, right: 0, bottom: 0, height: (V ? 460 : 300) + "px", background: "linear-gradient(180deg, transparent, rgba(5,7,10,.88) 70%)", pointerEvents: "none" });
+const vign = el("abs", { inset: 0, background: "radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0,0,0,.65))", pointerEvents: "none" });
+const fade = el("abs", { inset: 0, background: "#000", opacity: 0 });
+
+// ───────── render(t): estado completo do quadro no tempo t ─────────
+function render(t) {
+  // fundo
+  const warm = vis(t, 5.7, 12.9, .6, .5) ;
+  bg.v.style.opacity = (1 - warm * .75) * (.8 + .2 * Math.sin(t * .8)); bg.g.style.opacity = (1 - warm) * .8; bg.r.style.opacity = warm * (.75 + .25 * Math.sin(t * 3.1));
+  const dx = (a, p) => Math.sin(t * a + p);
+  bg.v.style.transform = `translate(${W * (.45 + .12 * dx(.31, 0)) - W * .45}px, ${H * (.28 + .06 * dx(.23, 1)) - W * .45}px)`;
+  bg.g.style.transform = `translate(${W * (.15 + .12 * dx(.27, 2)) - W * .35}px, ${H * (.78 + .05 * dx(.19, 3)) - W * .35}px)`;
+  bg.r.style.transform = `translate(${W * (.6 + .1 * dx(.4, 4)) - W * .42}px, ${H * (.5 + .1 * dx(.33, 5)) - W * .42}px)`;
+  bg.grid.style.opacity = .5 * vis(t, 0, 99, .8, .1);
+  bg.grid.style.transform = `translateY(${(t * 14) % 90}px)`;
+
+  // ── cena 1: lista de gastos passando
+  const f1 = vis(t, 1.9, 5.9, .6, .5);
+  flow.style.opacity = f1 * .95;
+  const fw = flowW, fh = flowH;
+  flow.style.left = (V ? (W - fw) / 2 : W - fw - 160) + "px"; flow.style.top = (V ? 560 : (H - fh) / 2) + "px";
+  const off = ((t - 2) * 950 * flowSc) % flowH;                           // rola rápido (gastos passando)
+  flowA.style.top = (-off) + "px"; flowB.style.top = (flowH - off) + "px";
+  // “saldo” do começo: aparece com a primeira frase e sai quando a lista começa a passar
+  const sd = vis(t, .2, 2.5, .6, .5);
+  saldo.style.opacity = sd; saldo.style.left = ((V ? W / 2 : W - 480) - parseFloat(saldo.style.width) / 2) + "px"; saldo.style.top = ((V ? 900 : H / 2) - 110 - E.in(P(t, 1.7, 2.5)) * 160) + "px";
+  saldo.style.transform = `scale(${lerp(.9, 1.04, P(t, .2, 2.5))})`;
+  flow.style.transform = `perspective(2200px) rotateY(${V ? 0 : -12}deg) rotateX(${V ? 8 : 4}deg) scale(${lerp(.92, 1.05, P(t, 1.9, 5.9))})`;
+  flow.style.filter = `blur(${lerp(5, 1.2, E.out(P(t, 2.1, 3.0))) + E.in(P(t, 4.4, 5.6)) * 14}px) brightness(${lerp(.55, 1, f1)})`;
+
+  // ── cena 2: colagem do caos
+  const f2 = vis(t, 5.7, 12.95, .5, .01);
+  const suck = E.in(P(t, 12.45, 13.15));
+  chaos.forEach((o, i) => {
+    const p = E.back(P(t, 5.7 + i * .35, 6.4 + i * .35));
+    const jit = P(t, 10.7, 12.4) * (noise(t * 8 + i) * 14);
+    const ax = Math.sin(t * (.6 + i * .13) + i) * 30, ay = Math.cos(t * (.5 + i * .11) + i * 2) * 36;
+    const w = tw, h = parseFloat(o.c.style.height);
+    const cx = (V ? o.x * W : (.5 + o.x * .45) * W) + ax + jit, cy = (V ? (.3 + o.y * .7) * H * .86 : (.14 + o.y * .68) * H) + ay;
+    const tx = V ? W / 2 : phoneTargetX(), ty = V ? 1030 : 470;
+    const x = lerp(cx, tx, suck), y = lerp(cy, ty, suck);
+    o.c.style.opacity = f2 * p * (1 - E.io(P(t, 12.95, 13.25)));
+    o.c.style.left = (x - w / 2) + "px"; o.c.style.top = (y - h / 2) + "px";
+    o.c.style.transform = `rotate(${o.r * (1 + .25 * Math.sin(t * 2 + i)) * (1 - suck)}deg) scale(${lerp(.7, 1, p) * lerp(1, .15, suck)})`;
+    o.c.style.filter = `blur(${lerp(0, 5, P(t, 9.5, 12.4)) * (i % 2 ? 1 : .5)}px) saturate(${lerp(1, .5, P(t, 8, 12))}) hue-rotate(${P(t, 8, 12) * -20}deg)`;
+  });
+
+  // ── transição de choque (13.0)
+  const sw = P(t, 12.95, 14.0);
+  flash.style.opacity = (1 - E.out(P(t, 12.95, 13.5))) * (t > 12.9 ? .9 : 0);
+  [ring, ring2].forEach((r, i) => {
+    const k = E.out(P(t, 13.0 + i * .12, 14.4 + i * .1)); const s = lerp(.2, 9, k);
+    r.style.opacity = (1 - k) * .9 * (t > 12.9 ? 1 : 0);
+    r.style.left = (W / 2 - 150) + "px"; r.style.top = (V ? 960 : H / 2) - 150 + "px"; r.style.transform = `scale(${s})`;
+  });
+
+  // ── logotipo grande (13.0–14.3) e depois pequeno no topo
+  const logoIn = E.back(P(t, 13.0, 13.7));
+  const logoToTop = E.io(P(t, 14.2, 15.0));
+  const logoBigOut = 1 - E.io(P(t, 19.7, 20.2));
+  const logoY = lerp(V ? 880 : H / 2 - 90, V ? 64 : 60, logoToTop);
+  const logoS = lerp(1.15, V ? .52 : .46, logoToTop) * lerp(.6, 1, logoIn);
+  const finalLogo = E.io(P(t, 31.5, 32.1)) * (1 - E.io(P(t, 36.9, 37.4)) * 0);   // volta no encerramento
+  const lo = t < 20 ? E.io(P(t, 13.0, 13.45)) * logoBigOut : finalLogo;
+  logoBig.style.opacity = t < 20 ? lo : finalLogo;
+  if (t < 20) {
+    logoBig.style.top = logoY + "px"; logoBig.style.left = (V ? 0 : lerp(0, 0, 1)) + "px";
+    logoBig.style.transform = `scale(${logoS})`; logoBig.style.filter = `blur(${Math.max(0, 1 - logoIn) * 18}px)`;
+    logoBig.style.transformOrigin = "50% 0";
+  } else {
+    const k = E.back(P(t, 31.6, 32.3));
+    logoBig.style.top = (V ? 330 : 140) + "px"; logoBig.style.transformOrigin = "50% 0"; logoBig.style.transform = `scale(${lerp(.7, 1.05, k)})`;
+    logoBig.style.filter = `blur(${Math.max(0, 1 - k) * 14}px)`;
+    if (!V) logoBig.style.left = (-(W / 2) + 110 + 440) + "px";
+  }
+  sheen.style.opacity = (t < 20 ? P(t, 13.2, 14.3) * (1 - P(t, 14.3, 14.6)) : P(t, 32.2, 33.2) * (1 - P(t, 33.2, 33.6))) * .9;
+  sheen.style.left = (t < 20 ? lerp(-300, 1500, P(t, 13.2, 14.5)) : lerp(-300, 1500, P(t, 32.2, 33.6))) + "px";
+
+  // ── celular
+  const phoneIn = E.out(P(t, 14.3, 15.4)), phoneOut = V ? E.io(P(t, 31.25, 32.1)) : 0;
+  let px = L.phoneX, py = L.phoneY, ps = L.phoneS, po = phoneIn * (1 - phoneOut), rx = 0, ry = 0, rz = 0;
+  if (V) { py = lerp(2300, L.phoneY, phoneIn) + phoneOut * 900; ry = Math.sin(t * .9) * 4; rx = Math.sin(t * .7) * 2 + (1 - phoneIn) * 14; }
+  else { px = lerp(W + 400, L.phoneX, phoneIn) + phoneOut * 700; ry = -10 + Math.sin(t * .9) * 4; rx = Math.sin(t * .7) * 2; rz = 3; py = L.phoneY; }
+  // zoom de destaque nas cenas 4 e 5
+  ps *= lerp(V ? .86 : .9, 1, E.io(P(t, 19.7, 20.6)))
+  ps *= 1 + .06 * E.io(P(t, 20, 21)) - .0 * 0 + .05 * E.io(P(t, 28.77, 29.7));
+  placePhone(px, py, ps, po, rx, ry, rz);
+  // conteúdo da tela
+  const w = { inicio: 0, orcamentos: 0, fixas: 0, investimentos: 0, dividas: 0, cartoes: 0, metas: 0 };
+  const sel = (a, b) => E.io(P(t, a, a + .4)) * (1 - E.io(P(t, b - .4, b)));
+  w.inicio = t < 20.4 ? 1 : 0; w.inicio *= 1 - E.io(P(t, 20.0, 20.45));
+  w.orcamentos = t < 22.7 ? E.io(P(t, 20.0, 20.45)) * (1 - E.io(P(t, 22.3, 22.7))) : 0;
+  w.fixas = E.io(P(t, 22.3, 22.7)) * (1 - E.io(P(t, 24.4, 24.8)));
+  w.investimentos = E.io(P(t, 24.4, 24.8)) * (1 - E.io(P(t, 26.0, 26.6)));
+  w.dividas = E.io(P(t, 26.0, 26.6)) * (V ? (t < 31.5 ? 1 : 0) : 1 - E.io(P(t, 31.3, 32.0)));
+  if (!V) w.cartoes = E.io(P(t, 31.3, 32.0));
+  setScreen(w);
+  // “foco” da cena 5: tela borrada → nítida
+  const blur5 = t >= 26 && t < 31.5 ? (1 - E.io(P(t, 28.77, 29.5))) * 13 : 0;
+  screen.style.filter = blur5 ? `blur(${blur5}px) brightness(${lerp(.75, 1, E.io(P(t, 28.77, 29.5)))})` : "none";
+  // realce das áreas importantes (percentuais da altura da tela)
+  const hlBeat = [[20.45, 22.3, 24, 39], [22.7, 24.4, 23, 51], [24.8, 26.0, 16.5, 33], [29.4, 31.2, 16.5, 54]];
+  let ho = 0, ht = 0, hb = 0;
+  hlBeat.forEach(([a, b, y0, y1]) => { const k = E.io(P(t, a, a + .35)) * (1 - E.io(P(t, b - .3, b))); if (k > ho) { ho = k; ht = y0; hb = y1; } });
+  hl.style.opacity = ho; hl.style.top = ht + "%"; hl.style.height = (hb - ht) + "%";
+  shine.style.opacity = t > 14.5 && (t < 31.5 || !V) ? .9 : 0; shine.style.top = (((t * 420) % (PH.h + 520)) - 260) + "px";
+
+  // halo de funcionalidades ao redor do celular (cena 3)
+  halo.forEach((o, i) => {
+    const a0 = 15.2 + i * .45, k = E.back(P(t, a0, a0 + .8)), out = 1 - E.io(P(t, 19.55 + i * .08, 20.1));
+    const ang = (o.ang + Math.sin(t * .8 + i) * 6) * Math.PI / 180;
+    const rxr = V ? 345 : 372, ryr = V ? 395 : 330;
+    const cx = px + Math.cos(ang) * rxr * k, cy = (V ? 1030 : 470) + Math.sin(ang) * ryr * k;
+    const h = parseFloat(o.c.style.height), wd = parseFloat(o.c.style.width);
+    o.c.style.opacity = k * out * .98; o.c.style.left = (cx - wd / 2) + "px"; o.c.style.top = (cy - h / 2) + "px";
+    o.c.style.transform = `scale(${lerp(.4, 1, k)}) rotate(${(i % 2 ? 4 : -4) * (1 - k * .5)}deg)`; o.c.style.zIndex = 3;
+  });
+
+  // textos cinéticos
+  K.forEach((k) => updKinetic(k, t));
+
+  // legendas
+  CAPS.forEach((c) => {
+    const o = t >= c.a - .05 && t <= c.b + .45 ? E.io(P(t, c.a - .05, c.a + .15)) * (1 - E.io(P(t, c.b + .15, c.b + .45))) : 0;
+    c.box.style.opacity = o; c.box.style.transform = `translateY(${(1 - E.io(P(t, c.a - .05, c.a + .25))) * 16}px)`;
+    if (o > 0) c.ws.forEach((w) => { const k = P(t, w.t0 - .05, w.t0 + .12), done = t > w.t1; w.s.style.color = k <= 0 ? "rgba(255,255,255,.42)" : done ? "rgba(255,255,255,.96)" : "#fff"; w.s.style.opacity = k <= 0 ? .62 : 1; });
+  });
+
+  // encerramento: botão + endereço
+  const ci = E.back(P(t, 34.1, 34.9));
+  const cw = cta.offsetWidth || 700;
+  cta.style.left = ((V ? W / 2 : 110 + cw / 2) - cw / 2) + "px"; cta.style.top = (V ? 1070 : 560) + "px";
+  cta.style.opacity = clamp(ci * 1.4) * (t > 31 ? 1 : 0); cta.style.transform = `scale(${lerp(.7, 1, ci) * (1 + .028 * Math.sin(t * 5.5) * (t > 35 ? 1 : 0))})`;
+  urlTag.style.opacity = E.io(P(t, 34.9, 35.5)) * (t > 31 ? 1 : 0); urlTag.style.top = (V ? 1260 : 720) + "px";
+  if (!V) { urlTag.style.left = (110 - 0) + "px"; urlTag.style.width = "900px"; urlTag.style.textAlign = "left"; }
+  foot.style.opacity = (vis(t, 14.6, 31.3, .5, .4) + E.io(P(t, 35.5, 36.1))) * .9;
+  if (!V) { foot.style.left = "110px"; foot.style.width = "900px"; foot.style.textAlign = "left"; foot.style.top = (H - 56) + "px"; }
+  // bolhas de anel na cena final
+  fade.style.opacity = E.io(P(t, 0, .35)) * 0 + (1 - E.out(P(t, 0, .5))) + E.io(P(t, DUR - .5, DUR));
+}
+function phoneTargetX() { return L.phoneX; }
+window.render = render; window.DUR = DUR;
+window.ready = Promise.all([document.fonts.load("800 100px InterV"), document.fonts.load("650 40px InterV"), ...[...Object.values(screens), ...chaos.map((o) => o.c), flow].map(() => Promise.resolve())]).then(() => Promise.all(["inicio","orcamentos","fixas","investimentos","dividas","cartoes","metas","movimentacoes"].map((n) => new Promise((res) => { const i = new Image(); i.onload = () => i.decode().then(res, res); i.onerror = res; i.src = IMG(n); }))));
+render(parseFloat(Q.get("t") || "0"));
+</script>
+</body>
+</html>
